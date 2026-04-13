@@ -170,7 +170,7 @@ function DashboardPage() {
                           {o.status}
                         </Badge>
                       </div>
-                    </Link>
+                    </a>
                   );
                 })}
                 {orders.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No orders yet</p>}
