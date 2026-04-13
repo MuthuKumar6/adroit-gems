@@ -47,9 +47,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           {navItems.map(({ to, label, icon: Icon }) => {
             const isActive = to === "/" ? location.pathname === "/" : location.pathname.startsWith(to);
             return (
-              <Link
+              <a
                 key={to}
-                to={to}
+                href={to}
                 onClick={() => setSidebarOpen(false)}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
                   isActive
@@ -64,7 +64,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     {unreadAlerts}
                   </Badge>
                 )}
-              </Link>
+              </a>
             );
           })}
         </nav>

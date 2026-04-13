@@ -159,7 +159,7 @@ function DashboardPage() {
                 {orders.slice(-5).reverse().map(o => {
                   const customer = customerStore.getById(o.customerId);
                   return (
-                    <Link key={o.id} to="/orders" className="flex items-center justify-between p-2 rounded-lg hover:bg-accent/50 transition-colors">
+                    <a key={o.id} href="/orders" className="flex items-center justify-between p-2 rounded-lg hover:bg-accent/50 transition-colors">
                       <div>
                         <p className="text-sm font-medium">{o.orderNumber}</p>
                         <p className="text-xs text-muted-foreground">{customer?.name}</p>

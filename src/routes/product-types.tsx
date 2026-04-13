@@ -19,7 +19,7 @@ export const Route = createFileRoute("/product-types")({
 
 const emptyForm = {
   productId: '', name: '', huids: '', grossWeight: '', netWeight: '', stoneWeight: '0',
-  wastagePercentage: '', makingCharges: '', makingChargeType: 'per_gram' as const,
+  wastagePercentage: '', makingCharges: '', makingChargeType: 'per_gram' as 'per_gram' | 'flat',
   description: '', quantity: '', inStock: '',
 };
 
@@ -152,7 +152,7 @@ function ProductTypesPage() {
                 <div className="grid gap-2"><Label>Making ₹</Label><Input type="number" value={form.makingCharges} onChange={e => setForm(f => ({ ...f, makingCharges: e.target.value }))} /></div>
                 <div className="grid gap-2">
                   <Label>Charge Type</Label>
-                  <Select value={form.makingChargeType} onValueChange={(v: 'per_gram' | 'flat') => setForm(f => ({ ...f, makingChargeType: v }))}>
+                  <Select value={form.makingChargeType} onValueChange={(v) => setForm(f => ({ ...f, makingChargeType: v as 'per_gram' | 'flat' }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="per_gram">Per Gram</SelectItem>
