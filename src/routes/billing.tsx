@@ -741,13 +741,14 @@ function BillingPage() {
   const [vybBill, setVybBill] = useState<Bill | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
 
-  const deliveredOrders = orderStore
-    .getAll()
-    .filter((o) => o.status === "delivered" || o.status === "approved");
+  const [orders, setOrders] = useState<Order[]>(orderStore.getAll());
+  const deliveredOrders = orders.filter((o) => o.status === "delivered" || o.status === "approved");
   const billedOrderIds = bills.map((b) => b.orderId);
   const unbilledOrders = deliveredOrders.filter(
     (o) => !billedOrderIds.includes(o.id)
   );
+
+  const refreshOrders = () => setOrders(orderStore.getAll());
 
   const [selectedOrderId, setSelectedOrderId] = useState("");
   const [discount, setDiscount] = useState("0");
