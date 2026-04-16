@@ -751,6 +751,12 @@ function BillingPage() {
 
   const refreshOrders = () => setOrders(orderStore.getAll());
 
+  // Refresh from localStorage on mount (handles navigation from orders page)
+  useEffect(() => {
+    setOrders(orderStore.getAll());
+    setBills(billStore.getAll());
+  }, []);
+
   const [selectedOrderId, setSelectedOrderId] = useState("");
   const [discount, setDiscount] = useState("0");
   const [paidAmount, setPaidAmount] = useState("");
