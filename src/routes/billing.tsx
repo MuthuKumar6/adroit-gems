@@ -745,9 +745,16 @@ function BillingPage() {
   const [orders, setOrders] = useState<Order[]>(orderStore.getAll());
   const deliveredOrders = orders.filter((o) => o.status === "delivered" || o.status === "approved");
   const billedOrderIds = bills.map((b) => b.orderId);
+
+  console.log("All orders:", billedOrderIds);
+
+    console.log("All orders:", deliveredOrders);
+
   const unbilledOrders = deliveredOrders.filter(
     (o) => !billedOrderIds.includes(o.id)
   );
+
+  console.log("Unbilled orders:", unbilledOrders);
 
   const refreshOrders = () => setOrders(orderStore.getAll());
 
