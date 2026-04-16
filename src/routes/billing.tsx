@@ -965,7 +965,7 @@ function BillingPage() {
           </div>
           <Button
             onClick={() => { refreshOrders(); setDialogOpen(true); }}
-            disabled={unbilledOrders.length === 0}
+            disabled={unbilledOrders.length == 0}
           >
             <Receipt className="h-4 w-4 mr-2" /> Create Bill
           </Button>
