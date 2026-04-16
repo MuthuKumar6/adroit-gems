@@ -18,7 +18,8 @@ import {
   orderStore, customerStore, productTypeStore, productStore, billStore,
 } from "@/lib/store";
 import type { Bill, Order } from "@/lib/types";
-import { useState, useRef } from "react";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { useState, useRef, useEffect } from "react";
 import { Receipt, Eye, Printer } from "lucide-react";
 
 export const Route = createFileRoute("/billing")({
@@ -741,13 +742,20 @@ function BillingPage() {
   const [vybBill, setVybBill] = useState<Bill | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
 
-  const deliveredOrders = orderStore
-    .getAll()
-    .filter((o) => o.status === "delivered" || o.status === "approved");
+  const [orders, setOrders] = useState<Order[]>(orderStore.getAll());
+  const deliveredOrders = orders.filter((o) => o.status === "delivered" || o.status === "approved");
   const billedOrderIds = bills.map((b) => b.orderId);
   const unbilledOrders = deliveredOrders.filter(
     (o) => !billedOrderIds.includes(o.id)
   );
+
+  const refreshOrders = () => setOrders(orderStore.getAll());
+
+  // Refresh from localStorage on mount (handles navigation from orders page)
+  useEffect(() => {
+    setOrders(orderStore.getAll());
+    setBills(billStore.getAll());
+  }, []);
 
   const [selectedOrderId, setSelectedOrderId] = useState("");
   const [discount, setDiscount] = useState("0");
@@ -949,7 +957,7 @@ function BillingPage() {
             </p>
           </div>
           <Button
-            onClick={() => setDialogOpen(true)}
+            onClick={() => { refreshOrders(); setDialogOpen(true); }}
             disabled={unbilledOrders.length === 0}
           >
             <Receipt className="h-4 w-4 mr-2" /> Create Bill
