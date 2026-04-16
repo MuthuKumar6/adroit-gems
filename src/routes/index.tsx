@@ -303,6 +303,23 @@ function DashboardPage() {
       });
   };
 
+  // For "Stock Reserved for Orders" section
+  const reservedStockItems = orders
+    .filter(o => ['pending', 'approved'].includes(o.status))
+    .flatMap(order => {
+      const customer = customerStore.getById(order.customerId);
+      return order.items.map(item => {
+        const pt = productTypes.find(p => p.id === item.productTypeId);
+        return {
+          orderNumber: order.orderNumber,
+          customerName: customer?.name || 'Unknown',
+          productTypeName: pt?.name || 'Unknown',
+          quantity: item.quantity,
+          netWeight: pt?.netWeight || 0,
+        };
+      });
+    });
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -338,7 +355,7 @@ function DashboardPage() {
         </div>
 
         {/* Inventory Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="glass-card">
             <CardHeader><CardTitle>Total Available Pieces</CardTitle></CardHeader>
             <CardContent>
@@ -359,6 +376,104 @@ function DashboardPage() {
             <CardHeader><CardTitle>Low Stock Items</CardTitle></CardHeader>
             <CardContent>
               <p className="text-4xl font-bold text-destructive">{lowStockCount}</p>
+            </CardContent>
+          </Card>
+        </div> */}
+
+        {/* === DETAILED SUMMARY CARDS === */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* 1. Total Available Pieces - Detailed */}
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                Total Available Pieces
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-4xl font-bold mb-4">
+                {productTypes.reduce((s, pt) => s + pt.inStock, 0)}
+              </p>
+              <div className="space-y-2 max-h-60 overflow-auto pr-2">
+                {productTypes
+                  .filter(pt => pt.inStock > 0)
+                  .sort((a, b) => b.inStock - a.inStock)
+                  .map(pt => (
+                    <div key={pt.id} className="flex justify-between text-sm">
+                      <span>{pt.name}</span>
+                      <span className="font-medium text-green-600">{pt.inStock} pcs</span>
+                    </div>
+                  ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 2. Stock Reserved for Orders - Detailed */}
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-amber-600" />
+                Stock Reserved for Orders
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-4xl font-bold text-amber-600 mb-4">
+                {orders
+                  .filter(o => ['pending', 'approved'].includes(o.status))
+                  .reduce((sum, o) => sum + o.items.reduce((iSum, i) => iSum + i.quantity, 0), 0)}
+              </p>
+
+              {reservedStockItems.length > 0 ? (
+                <div className="space-y-3 max-h-60 overflow-auto">
+                  {reservedStockItems.slice(0, 8).map((item, idx) => (
+                    <div key={idx} className="flex justify-between items-center bg-amber-50/50 dark:bg-amber-950/30 p-2 rounded border border-amber-200/50">
+                      <div>
+                        <p className="text-sm font-medium">{item.productTypeName}</p>
+                        <p className="text-xs text-muted-foreground">{item.customerName}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium">{item.quantity} pcs</p>
+                        <p className="text-xs text-muted-foreground">{item.netWeight * item.quantity}g</p>
+                      </div>
+                    </div>
+                  ))}
+                  {reservedStockItems.length > 8 && (
+                    <p className="text-xs text-center text-muted-foreground">+ {reservedStockItems.length - 8} more reservations</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-center py-8 text-muted-foreground">No stock currently reserved for orders</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* 3. Low Stock Items - Detailed */}
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+                Low Stock Items
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-4xl font-bold text-destructive mb-4">{lowStockCount}</p>
+              {lowStockCount > 0 ? (
+                <div className="space-y-2">
+                  {productTypes
+                    .filter(pt => pt.inStock <= 3)
+                    .map(pt => (
+                      <div key={pt.id} className="flex justify-between p-2 bg-destructive/5 border border-destructive/20 rounded">
+                        <div>
+                          <p className="font-medium text-sm">{pt.name}</p>
+                          <p className="text-xs text-muted-foreground">{pt.netWeight}g each</p>
+                        </div>
+                        <Badge variant="destructive" className="self-center">{pt.inStock} left</Badge>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <p className="text-center py-10 text-green-600 font-medium">✅ All product types are well stocked</p>
+              )}
             </CardContent>
           </Card>
         </div>

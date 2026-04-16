@@ -82,6 +82,7 @@ function ProductTypesPage() {
                     <TableHead>Metal</TableHead>
                     <TableHead>HUIDs</TableHead>
                     <TableHead>Net Wt (g)</TableHead>
+                    <TableHead>Wastage %</TableHead>
                     <TableHead>Making</TableHead>
                     <TableHead>Stock</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -101,6 +102,7 @@ function ProductTypesPage() {
                           </div>
                         </TableCell>
                         <TableCell>{pt.netWeight}g</TableCell>
+                        <TableCell>{pt.wastagePercentage}%</TableCell>
                         <TableCell>₹{pt.makingCharges}/{pt.makingChargeType === 'per_gram' ? 'g' : 'flat'}</TableCell>
                         <TableCell>
                           <Badge variant={pt.inStock <= 0 ? 'destructive' : pt.inStock <= 3 ? 'outline' : 'default'}>
