@@ -18,6 +18,7 @@ import {
   orderStore, customerStore, productTypeStore, productStore, billStore,
 } from "@/lib/store";
 import type { Bill, Order } from "@/lib/types";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { useState, useRef } from "react";
 import { Receipt, Eye, Printer } from "lucide-react";
 
@@ -950,7 +951,7 @@ function BillingPage() {
             </p>
           </div>
           <Button
-            onClick={() => setDialogOpen(true)}
+            onClick={() => { refreshOrders(); setDialogOpen(true); }}
             disabled={unbilledOrders.length === 0}
           >
             <Receipt className="h-4 w-4 mr-2" /> Create Bill
