@@ -15,18 +15,18 @@ export const Route = createFileRoute("/")({
 });
 
 function DashboardPage() {
-  const [, setTick] = useState(0);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     initializeSeedData();
-    setTick(t => t + 1);
+    setHydrated(true);
   }, []);
 
-  const productTypes = productTypeStore.getAll();
-  const orders = orderStore.getAll();
-  const customers = customerStore.getAll();
-  const bills = billStore.getAll();
-  const alerts = alertStore.getUnread();
+  const productTypes = hydrated ? productTypeStore.getAll() : [];
+  const orders = hydrated ? orderStore.getAll() : [];
+  const customers = hydrated ? customerStore.getAll() : [];
+  const bills = hydrated ? billStore.getAll() : [];
+  const alerts = hydrated ? alertStore.getUnread() : [];
 
   const totalRevenue = bills.reduce((s, b) => s + b.totalAmount, 0);
   const totalStockWeight = productTypes.reduce((s, pt) => s + pt.inStock * pt.netWeight, 0);
