@@ -19,7 +19,7 @@ import {
 } from "@/lib/store";
 import type { Bill, Order } from "@/lib/types";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Receipt, Eye, Printer } from "lucide-react";
 
 export const Route = createFileRoute("/billing")({
