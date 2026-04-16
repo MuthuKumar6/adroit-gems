@@ -754,7 +754,7 @@ function BillingPage() {
     (o) => !billedOrderIds.includes(o.id)
   );
 
-  console.log("Unbilled orders:", unbilledOrders);
+  console.log("Unbilled orders:", unbilledOrders, unbilledOrders.length);
 
   const refreshOrders = () => setOrders(orderStore.getAll());
 
