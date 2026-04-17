@@ -735,33 +735,29 @@ function VyabariInvoice({ bill }: { bill: Bill }) {
 
 /* ─── Main page ────────────────────────────────────────── */
 function BillingPage() {
-  const [bills, setBills] = useState<Bill[]>(billStore.getAll());
+  const [hydrated, setHydrated] = useState(false);
+  const [bills, setBills] = useState<Bill[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [detailBill, setDetailBill] = useState<Bill | null>(null);
   const [invoiceBill, setInvoiceBill] = useState<Bill | null>(null);
   const [vybBill, setVybBill] = useState<Bill | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
 
-  const [orders, setOrders] = useState<Order[]>(orderStore.getAll());
   const deliveredOrders = orders.filter((o) => o.status === "delivered" || o.status === "approved");
   const billedOrderIds = bills.map((b) => b.orderId);
-
-  console.log("All orders:", billedOrderIds);
-
-    console.log("All orders:", deliveredOrders);
 
   const unbilledOrders = deliveredOrders.filter(
     (o) => !billedOrderIds.includes(o.id)
   );
 
-  console.log("Unbilled orders:", unbilledOrders);
-
   const refreshOrders = () => setOrders(orderStore.getAll());
 
-  // Refresh from localStorage on mount (handles navigation from orders page)
+  // Hydrate from localStorage on client mount (avoids SSR mismatch on Netlify)
   useEffect(() => {
     setOrders(orderStore.getAll());
     setBills(billStore.getAll());
+    setHydrated(true);
   }, []);
 
   const [selectedOrderId, setSelectedOrderId] = useState("");
