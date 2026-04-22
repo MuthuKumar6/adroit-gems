@@ -328,16 +328,23 @@
 
 
 import type { Product, ProductType, Customer, Order, Bill, Restriction, StockAlert } from './types';
+import { auth } from './auth';
+
+// Multi-tenant: all keys are namespaced by current shopId.
+// If no shop is logged in, falls back to a "guest" namespace (so SSR/preview don't crash).
+function shopId(): string {
+  return auth.getCurrentShopId() || 'guest';
+}
 
 const KEYS = {
-  products: 'jewel_erp_products',
-  productTypes: 'jewel_erp_product_types',
-  customers: 'jewel_erp_customers',
-  orders: 'jewel_erp_orders',
-  bills: 'jewel_erp_bills',
-  restrictions: 'jewel_erp_restrictions',
-  alerts: 'jewel_erp_alerts',
-  initialized: 'jewel_erp_initialized',
+  get products() { return `jewel_erp:${shopId()}:products`; },
+  get productTypes() { return `jewel_erp:${shopId()}:product_types`; },
+  get customers() { return `jewel_erp:${shopId()}:customers`; },
+  get orders() { return `jewel_erp:${shopId()}:orders`; },
+  get bills() { return `jewel_erp:${shopId()}:bills`; },
+  get restrictions() { return `jewel_erp:${shopId()}:restrictions`; },
+  get alerts() { return `jewel_erp:${shopId()}:alerts`; },
+  get initialized() { return `jewel_erp:${shopId()}:initialized`; },
 };
 
 function get<T>(key: string): T[] {
