@@ -10,11 +10,13 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as StockRouteImport } from './routes/stock'
+import { Route as SignupRouteImport } from './routes/signup'
 import { Route as RestrictionsRouteImport } from './routes/restrictions'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ProductsRouteImport } from './routes/products'
 import { Route as ProductTypesRouteImport } from './routes/product-types'
 import { Route as OrdersRouteImport } from './routes/orders'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as BillingRouteImport } from './routes/billing'
 import { Route as IndexRouteImport } from './routes/index'
@@ -22,6 +24,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const StockRoute = StockRouteImport.update({
   id: '/stock',
   path: '/stock',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RestrictionsRoute = RestrictionsRouteImport.update({
@@ -49,6 +56,11 @@ const OrdersRoute = OrdersRouteImport.update({
   path: '/orders',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CustomersRoute = CustomersRouteImport.update({
   id: '/customers',
   path: '/customers',
@@ -69,22 +81,26 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/billing': typeof BillingRoute
   '/customers': typeof CustomersRoute
+  '/login': typeof LoginRoute
   '/orders': typeof OrdersRoute
   '/product-types': typeof ProductTypesRoute
   '/products': typeof ProductsRoute
   '/reports': typeof ReportsRoute
   '/restrictions': typeof RestrictionsRoute
+  '/signup': typeof SignupRoute
   '/stock': typeof StockRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/billing': typeof BillingRoute
   '/customers': typeof CustomersRoute
+  '/login': typeof LoginRoute
   '/orders': typeof OrdersRoute
   '/product-types': typeof ProductTypesRoute
   '/products': typeof ProductsRoute
   '/reports': typeof ReportsRoute
   '/restrictions': typeof RestrictionsRoute
+  '/signup': typeof SignupRoute
   '/stock': typeof StockRoute
 }
 export interface FileRoutesById {
@@ -92,11 +108,13 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/billing': typeof BillingRoute
   '/customers': typeof CustomersRoute
+  '/login': typeof LoginRoute
   '/orders': typeof OrdersRoute
   '/product-types': typeof ProductTypesRoute
   '/products': typeof ProductsRoute
   '/reports': typeof ReportsRoute
   '/restrictions': typeof RestrictionsRoute
+  '/signup': typeof SignupRoute
   '/stock': typeof StockRoute
 }
 export interface FileRouteTypes {
@@ -105,33 +123,39 @@ export interface FileRouteTypes {
     | '/'
     | '/billing'
     | '/customers'
+    | '/login'
     | '/orders'
     | '/product-types'
     | '/products'
     | '/reports'
     | '/restrictions'
+    | '/signup'
     | '/stock'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/billing'
     | '/customers'
+    | '/login'
     | '/orders'
     | '/product-types'
     | '/products'
     | '/reports'
     | '/restrictions'
+    | '/signup'
     | '/stock'
   id:
     | '__root__'
     | '/'
     | '/billing'
     | '/customers'
+    | '/login'
     | '/orders'
     | '/product-types'
     | '/products'
     | '/reports'
     | '/restrictions'
+    | '/signup'
     | '/stock'
   fileRoutesById: FileRoutesById
 }
@@ -139,11 +163,13 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BillingRoute: typeof BillingRoute
   CustomersRoute: typeof CustomersRoute
+  LoginRoute: typeof LoginRoute
   OrdersRoute: typeof OrdersRoute
   ProductTypesRoute: typeof ProductTypesRoute
   ProductsRoute: typeof ProductsRoute
   ReportsRoute: typeof ReportsRoute
   RestrictionsRoute: typeof RestrictionsRoute
+  SignupRoute: typeof SignupRoute
   StockRoute: typeof StockRoute
 }
 
@@ -154,6 +180,13 @@ declare module '@tanstack/react-router' {
       path: '/stock'
       fullPath: '/stock'
       preLoaderRoute: typeof StockRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/restrictions': {
@@ -191,6 +224,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrdersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/customers': {
       id: '/customers'
       path: '/customers'
@@ -219,11 +259,13 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BillingRoute: BillingRoute,
   CustomersRoute: CustomersRoute,
+  LoginRoute: LoginRoute,
   OrdersRoute: OrdersRoute,
   ProductTypesRoute: ProductTypesRoute,
   ProductsRoute: ProductsRoute,
   ReportsRoute: ReportsRoute,
   RestrictionsRoute: RestrictionsRoute,
+  SignupRoute: SignupRoute,
   StockRoute: StockRoute,
 }
 export const routeTree = rootRouteImport
