@@ -155,6 +155,15 @@ export const orderStore = {
     }
     return newItem;
   },
+  update: (id: string, data: Partial<Order>) => {
+    const items = get<Order>(KEYS.orders);
+    const idx = items.findIndex(o => o.id === id);
+    if (idx !== -1) {
+      items[idx] = { ...items[idx], ...data, updatedAt: new Date().toISOString() };
+      set(KEYS.orders, items);
+    }
+    return items[idx];
+  },
   updateStatus: (id: string, status: Order['status']) => {
     const items = get<Order>(KEYS.orders);
     const idx = items.findIndex(o => o.id === id);
