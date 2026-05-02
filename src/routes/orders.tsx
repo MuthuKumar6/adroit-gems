@@ -37,6 +37,7 @@ function OrdersPage() {
   const [customerId, setCustomerId] = useState('');
   const [orderItems, setOrderItems] = useState<{ productTypeId: string; quantity: number; huids: string }[]>([]);
   const [notes, setNotes] = useState('');
+  const [paymentDueDate, setPaymentDueDate] = useState('');
 
   const customers = customerStore.getAll();
   const productTypes = productTypeStore.getAll();
@@ -106,6 +107,8 @@ function OrdersPage() {
       gstAmount,
       totalAmount: subtotal + gstAmount,
       notes,
+      paymentDueDate: paymentDueDate || undefined,
+      paymentReceived: false,
     });
 
     refresh();
@@ -113,6 +116,7 @@ function OrdersPage() {
     setCustomerId('');
     setOrderItems([]);
     setNotes('');
+    setPaymentDueDate('');
     setLimitWarning('');
   };
 
