@@ -118,7 +118,7 @@ function OrdersPage() {
       gstAmount,
       totalAmount: subtotal + gstAmount,
       notes,
-      paymentDueDate: paymentDueDate || undefined,
+      paymentDueDate: paymentDueDate ? new Date(paymentDueDate).toISOString() : undefined,
       paymentReceived: false,
     });
 
