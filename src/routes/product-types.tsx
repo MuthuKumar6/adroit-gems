@@ -141,7 +141,7 @@ function ProductTypesPage() {
                       </TableRow>
                     );
                   })}
-                  {items.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No product types</TableCell></TableRow>}
+                  {items.length === 0 && <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No product types</TableCell></TableRow>}
                 </TableBody>
               </Table>
             </div>
