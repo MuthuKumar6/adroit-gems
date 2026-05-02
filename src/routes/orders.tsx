@@ -10,8 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { orderStore, customerStore, productTypeStore, productStore, restrictionStore, billStore } from "@/lib/store";
 import type { Order, OrderItem } from "@/lib/types";
-import { useState } from "react";
-import { Plus, Eye, ChevronRight, AlertTriangle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, Eye, ChevronRight, AlertTriangle, Pencil } from "lucide-react";
 
 export const Route = createFileRoute("/orders")({
   component: OrdersPage,
@@ -30,8 +30,19 @@ function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>(orderStore.getAll());
   const [dialogOpen, setDialogOpen] = useState(false);
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
+  const [editOrder, setEditOrder] = useState<Order | null>(null);
+  const [editNotes, setEditNotes] = useState('');
+  const [editDueDate, setEditDueDate] = useState('');
+  const [editStatus, setEditStatus] = useState<Order['status']>('pending');
   const [statusFilter, setStatusFilter] = useState('all');
   const [limitWarning, setLimitWarning] = useState('');
+  const [, setNowTick] = useState(0);
+
+  // Re-render every second so overdue badges/countdowns update live
+  useEffect(() => {
+    const t = setInterval(() => setNowTick(n => n + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   // New order form
   const [customerId, setCustomerId] = useState('');
@@ -107,7 +118,7 @@ function OrdersPage() {
       gstAmount,
       totalAmount: subtotal + gstAmount,
       notes,
-      paymentDueDate: paymentDueDate || undefined,
+      paymentDueDate: paymentDueDate ? new Date(paymentDueDate).toISOString() : undefined,
       paymentReceived: false,
     });
 
@@ -191,18 +202,42 @@ function OrdersPage() {
                         <TableCell className="text-xs">
                           {o.paymentDueDate ? (() => {
                             const due = new Date(o.paymentDueDate);
-                            const today = new Date(); today.setHours(0,0,0,0);
-                            const overdue = o.status === 'pending' && due < today;
+                            const now = new Date();
+                            const startOfToday = new Date(); startOfToday.setHours(0,0,0,0);
+                            const endOfToday = new Date(); endOfToday.setHours(23,59,59,999);
+                            const isPending = o.status === 'pending';
+                            const overdue = isPending && due < now;
+                            const dueToday = isPending && due >= startOfToday && due <= endOfToday && due >= now;
+                            const diffMs = Math.abs(due.getTime() - now.getTime());
+                            const s = Math.floor(diffMs / 1000);
+                            const d = Math.floor(s / 86400);
+                            const h = Math.floor((s % 86400) / 3600);
+                            const m = Math.floor((s % 3600) / 60);
+                            const sec = s % 60;
+                            const remaining = d > 0 ? `${d}d ${h}h` : `${h}h ${m}m ${sec}s`;
                             return (
-                              <Badge variant={overdue ? 'destructive' : 'outline'}>
-                                {due.toLocaleDateString()}{overdue ? ' • Overdue' : ''}
-                              </Badge>
+                              <div className="flex flex-col gap-0.5">
+                                <Badge variant={overdue ? 'destructive' : dueToday ? 'default' : 'outline'} className="w-fit">
+                                  {due.toLocaleDateString()} {due.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </Badge>
+                                {isPending && (
+                                  <span className={`font-mono text-[10px] ${overdue ? 'text-destructive' : dueToday ? 'text-warning' : 'text-muted-foreground'}`}>
+                                    {overdue ? `${remaining} late` : `${remaining} left`}
+                                  </span>
+                                )}
+                              </div>
                             );
                           })() : <span className="text-muted-foreground">—</span>}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">{new Date(o.createdAt).toLocaleDateString()}</TableCell>
                         <TableCell className="text-right">
                           <Button variant="ghost" size="icon" onClick={() => setDetailOrder(o)}><Eye className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => {
+                            setEditOrder(o);
+                            setEditNotes(o.notes || '');
+                            setEditDueDate(o.paymentDueDate ? new Date(o.paymentDueDate).toISOString().slice(0, 16) : '');
+                            setEditStatus(o.status);
+                          }}><Pencil className="h-4 w-4" /></Button>
                         </TableCell>
                       </TableRow>
                     );
@@ -284,9 +319,9 @@ function OrdersPage() {
                   <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Additional notes..." />
                 </div>
                 <div className="grid gap-2">
-                  <Label>Payment Due Date</Label>
-                  <Input type="date" value={paymentDueDate} onChange={e => setPaymentDueDate(e.target.value)} min={new Date().toISOString().split('T')[0]} />
-                  <p className="text-[10px] text-muted-foreground">Alert shown on dashboard if pending past this date</p>
+                  <Label>Payment Due Date & Time</Label>
+                  <Input type="datetime-local" value={paymentDueDate} onChange={e => setPaymentDueDate(e.target.value)} min={new Date().toISOString().slice(0, 16)} />
+                  <p className="text-[10px] text-muted-foreground">Live countdown shown; alert on dashboard when due today or overdue</p>
                 </div>
               </div>
             </div>
@@ -347,6 +382,55 @@ function OrdersPage() {
                 )}
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Order Dialog */}
+        <Dialog open={!!editOrder} onOpenChange={(o) => { if (!o) setEditOrder(null); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Order {editOrder?.orderNumber}</DialogTitle>
+              <DialogDescription>Update status, payment due date/time, and notes</DialogDescription>
+            </DialogHeader>
+            {editOrder && (
+              <div className="grid gap-4 py-2">
+                <div className="grid gap-2">
+                  <Label>Status</Label>
+                  <Select value={editStatus} onValueChange={(v) => setEditStatus(v as Order['status'])}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {['pending', 'approved', 'dispatched', 'delivered', 'cancelled', 'returned'].map(s => (
+                        <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label>Payment Due Date & Time</Label>
+                  <Input type="datetime-local" value={editDueDate} onChange={e => setEditDueDate(e.target.value)} />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Notes</Label>
+                  <Input value={editNotes} onChange={e => setEditNotes(e.target.value)} />
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditOrder(null)}>Cancel</Button>
+              <Button onClick={() => {
+                if (!editOrder) return;
+                // Status change uses updateStatus to keep stock side-effects
+                if (editStatus !== editOrder.status) {
+                  orderStore.updateStatus(editOrder.id, editStatus);
+                }
+                orderStore.update(editOrder.id, {
+                  notes: editNotes,
+                  paymentDueDate: editDueDate ? new Date(editDueDate).toISOString() : undefined,
+                });
+                setEditOrder(null);
+                refresh();
+              }}>Save Changes</Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

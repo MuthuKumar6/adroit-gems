@@ -16,10 +16,13 @@ export const Route = createFileRoute("/")({
 
 function DashboardPage() {
   const [hydrated, setHydrated] = useState(false);
+  const [, setNowTick] = useState(0);
 
   useEffect(() => {
     initializeSeedData();
     setHydrated(true);
+    const t = setInterval(() => setNowTick(n => n + 1), 1000);
+    return () => clearInterval(t);
   }, []);
 
   const productTypes = hydrated ? productTypeStore.getAll() : [];
@@ -132,30 +135,81 @@ function DashboardPage() {
           </div>
         )}
 
-        {/* Payment Overdue Alerts */}
+        {/* Payment Due Today (with live countdown) + Overdue */}
         {(() => {
-          const today = new Date(); today.setHours(0,0,0,0);
-          const overdue = orders.filter(o => o.status === 'pending' && o.paymentDueDate && new Date(o.paymentDueDate) < today);
-          if (overdue.length === 0) return null;
+          const now = new Date();
+          const startOfToday = new Date(); startOfToday.setHours(0,0,0,0);
+          const endOfToday = new Date(); endOfToday.setHours(23,59,59,999);
+
+          const pending = orders.filter(o => o.status === 'pending' && o.paymentDueDate);
+          const dueToday = pending.filter(o => {
+            const due = new Date(o.paymentDueDate!);
+            return due >= startOfToday && due <= endOfToday && due >= now;
+          });
+          const overdue = pending.filter(o => new Date(o.paymentDueDate!) < now);
+
+          const fmtCountdown = (ms: number) => {
+            if (ms <= 0) return '0s';
+            const s = Math.floor(ms / 1000);
+            const h = Math.floor(s / 3600);
+            const m = Math.floor((s % 3600) / 60);
+            const sec = s % 60;
+            return `${h}h ${m}m ${sec}s`;
+          };
+          const fmtLate = (ms: number) => {
+            const s = Math.floor(ms / 1000);
+            const d = Math.floor(s / 86400);
+            const h = Math.floor((s % 86400) / 3600);
+            const m = Math.floor((s % 3600) / 60);
+            if (d > 0) return `${d}d ${h}h late`;
+            if (h > 0) return `${h}h ${m}m late`;
+            return `${m}m late`;
+          };
+
+          if (dueToday.length === 0 && overdue.length === 0) return null;
           return (
-            <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
-              <div className="flex items-center gap-2 text-destructive mb-2">
-                <Clock className="h-4 w-4" />
-                <span className="font-semibold">Payment Overdue ({overdue.length})</span>
-              </div>
-              <div className="space-y-1">
-                {overdue.slice(0, 5).map(o => {
-                  const c = customerStore.getById(o.customerId);
-                  const due = new Date(o.paymentDueDate!);
-                  const daysLate = Math.floor((today.getTime() - due.getTime()) / 86400000);
-                  return (
-                    <p key={o.id} className="text-sm text-muted-foreground">
-                      <span className="font-medium text-foreground">{c?.name || 'Unknown'}</span> — Order {o.orderNumber} — ₹{o.totalAmount.toLocaleString('en-IN')} — <span className="text-destructive">Time limit is over ({daysLate}d late)</span>
-                    </p>
-                  );
-                })}
-                {overdue.length > 5 && <p className="text-xs text-muted-foreground">+ {overdue.length - 5} more overdue</p>}
-              </div>
+            <div className="space-y-3">
+              {dueToday.length > 0 && (
+                <div className="rounded-lg border border-warning/40 bg-warning/5 p-4">
+                  <div className="flex items-center gap-2 text-warning mb-2">
+                    <Clock className="h-4 w-4" />
+                    <span className="font-semibold">Payment Due Today ({dueToday.length})</span>
+                  </div>
+                  <div className="space-y-1">
+                    {dueToday.map(o => {
+                      const c = customerStore.getById(o.customerId);
+                      const due = new Date(o.paymentDueDate!);
+                      const remaining = due.getTime() - now.getTime();
+                      return (
+                        <p key={o.id} className="text-sm text-muted-foreground">
+                          <span className="font-medium text-foreground">{c?.name || 'Unknown'}</span> — Order {o.orderNumber} — ₹{o.totalAmount.toLocaleString('en-IN')} — Due at <span className="font-medium text-foreground">{due.toLocaleTimeString()}</span> — <span className="text-warning font-mono">{fmtCountdown(remaining)} left</span>
+                        </p>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {overdue.length > 0 && (
+                <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
+                  <div className="flex items-center gap-2 text-destructive mb-2">
+                    <Clock className="h-4 w-4" />
+                    <span className="font-semibold">Payment Overdue ({overdue.length})</span>
+                  </div>
+                  <div className="space-y-1">
+                    {overdue.slice(0, 5).map(o => {
+                      const c = customerStore.getById(o.customerId);
+                      const due = new Date(o.paymentDueDate!);
+                      const lateMs = now.getTime() - due.getTime();
+                      return (
+                        <p key={o.id} className="text-sm text-muted-foreground">
+                          <span className="font-medium text-foreground">{c?.name || 'Unknown'}</span> — Order {o.orderNumber} — ₹{o.totalAmount.toLocaleString('en-IN')} — <span className="text-destructive">Time limit is over ({fmtLate(lateMs)})</span>
+                        </p>
+                      );
+                    })}
+                    {overdue.length > 5 && <p className="text-xs text-muted-foreground">+ {overdue.length - 5} more overdue</p>}
+                  </div>
+                </div>
+              )}
             </div>
           );
         })()}
