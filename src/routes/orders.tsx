@@ -38,12 +38,11 @@ function OrdersPage() {
   const [limitWarning, setLimitWarning] = useState('');
   const [, setNowTick] = useState(0);
 
-  // Re-render every second so overdue badges update live
-  useState(() => {
-    if (typeof window === 'undefined') return;
+  // Re-render every second so overdue badges/countdowns update live
+  useEffect(() => {
     const t = setInterval(() => setNowTick(n => n + 1), 1000);
     return () => clearInterval(t);
-  });
+  }, []);
 
   // New order form
   const [customerId, setCustomerId] = useState('');
