@@ -132,6 +132,34 @@ function DashboardPage() {
           </div>
         )}
 
+        {/* Payment Overdue Alerts */}
+        {(() => {
+          const today = new Date(); today.setHours(0,0,0,0);
+          const overdue = orders.filter(o => o.status === 'pending' && o.paymentDueDate && new Date(o.paymentDueDate) < today);
+          if (overdue.length === 0) return null;
+          return (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
+              <div className="flex items-center gap-2 text-destructive mb-2">
+                <Clock className="h-4 w-4" />
+                <span className="font-semibold">Payment Overdue ({overdue.length})</span>
+              </div>
+              <div className="space-y-1">
+                {overdue.slice(0, 5).map(o => {
+                  const c = customerStore.getById(o.customerId);
+                  const due = new Date(o.paymentDueDate!);
+                  const daysLate = Math.floor((today.getTime() - due.getTime()) / 86400000);
+                  return (
+                    <p key={o.id} className="text-sm text-muted-foreground">
+                      <span className="font-medium text-foreground">{c?.name || 'Unknown'}</span> — Order {o.orderNumber} — ₹{o.totalAmount.toLocaleString('en-IN')} — <span className="text-destructive">Time limit is over ({daysLate}d late)</span>
+                    </p>
+                  );
+                })}
+                {overdue.length > 5 && <p className="text-xs text-muted-foreground">+ {overdue.length - 5} more overdue</p>}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Quick Stats */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {stats.map(s => (
