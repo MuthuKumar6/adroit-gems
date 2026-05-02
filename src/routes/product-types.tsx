@@ -18,10 +18,16 @@ export const Route = createFileRoute("/product-types")({
 });
 
 const emptyForm = {
-  productId: '', name: '', huids: '', grossWeight: '', netWeight: '', stoneWeight: '0',
+  productId: '', name: '', tagNo: '', hasSubName: false, taxable: true,
+  huids: '', grossWeight: '', netWeight: '', stoneWeight: '0',
   wastagePercentage: '', makingCharges: '', makingChargeType: 'per_gram' as 'per_gram' | 'flat',
   description: '', quantity: '', inStock: '',
 };
+
+function generateSubNames(tagNo: string, qty: number): string[] {
+  if (!tagNo || qty <= 0) return [];
+  return Array.from({ length: qty }, (_, i) => `${tagNo}-${String(i + 1).padStart(3, '0')}`);
+}
 
 function ProductTypesPage() {
   const [items, setItems] = useState<ProductType[]>(productTypeStore.getAll());
@@ -36,7 +42,9 @@ function ProductTypesPage() {
   const openEdit = (pt: ProductType) => {
     setEditing(pt);
     setForm({
-      productId: pt.productId, name: pt.name, huids: pt.huids.join(', '),
+      productId: pt.productId, name: pt.name,
+      tagNo: pt.tagNo || '', hasSubName: pt.hasSubName ?? false, taxable: pt.taxable ?? true,
+      huids: pt.huids.join(', '),
       grossWeight: String(pt.grossWeight), netWeight: String(pt.netWeight), stoneWeight: String(pt.stoneWeight),
       wastagePercentage: String(pt.wastagePercentage), makingCharges: String(pt.makingCharges),
       makingChargeType: pt.makingChargeType, description: pt.description,
@@ -46,13 +54,16 @@ function ProductTypesPage() {
   };
 
   const handleSave = () => {
+    const qty = Number(form.quantity);
     const data = {
       productId: form.productId, name: form.name,
+      tagNo: form.tagNo, hasSubName: form.hasSubName, taxable: form.taxable,
+      subNames: form.hasSubName ? generateSubNames(form.tagNo, qty) : [],
       huids: form.huids.split(',').map(h => h.trim()).filter(Boolean),
       grossWeight: Number(form.grossWeight), netWeight: Number(form.netWeight),
       stoneWeight: Number(form.stoneWeight), wastagePercentage: Number(form.wastagePercentage),
       makingCharges: Number(form.makingCharges), makingChargeType: form.makingChargeType,
-      description: form.description, quantity: Number(form.quantity), inStock: Number(form.inStock),
+      description: form.description, quantity: qty, inStock: Number(form.inStock),
     };
     if (editing) { productTypeStore.update(editing.id, data); }
     else { productTypeStore.add(data); }
