@@ -202,18 +202,42 @@ function OrdersPage() {
                         <TableCell className="text-xs">
                           {o.paymentDueDate ? (() => {
                             const due = new Date(o.paymentDueDate);
-                            const today = new Date(); today.setHours(0,0,0,0);
-                            const overdue = o.status === 'pending' && due < today;
+                            const now = new Date();
+                            const startOfToday = new Date(); startOfToday.setHours(0,0,0,0);
+                            const endOfToday = new Date(); endOfToday.setHours(23,59,59,999);
+                            const isPending = o.status === 'pending';
+                            const overdue = isPending && due < now;
+                            const dueToday = isPending && due >= startOfToday && due <= endOfToday && due >= now;
+                            const diffMs = Math.abs(due.getTime() - now.getTime());
+                            const s = Math.floor(diffMs / 1000);
+                            const d = Math.floor(s / 86400);
+                            const h = Math.floor((s % 86400) / 3600);
+                            const m = Math.floor((s % 3600) / 60);
+                            const sec = s % 60;
+                            const remaining = d > 0 ? `${d}d ${h}h` : `${h}h ${m}m ${sec}s`;
                             return (
-                              <Badge variant={overdue ? 'destructive' : 'outline'}>
-                                {due.toLocaleDateString()}{overdue ? ' • Overdue' : ''}
-                              </Badge>
+                              <div className="flex flex-col gap-0.5">
+                                <Badge variant={overdue ? 'destructive' : dueToday ? 'default' : 'outline'} className="w-fit">
+                                  {due.toLocaleDateString()} {due.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </Badge>
+                                {isPending && (
+                                  <span className={`font-mono text-[10px] ${overdue ? 'text-destructive' : dueToday ? 'text-warning' : 'text-muted-foreground'}`}>
+                                    {overdue ? `${remaining} late` : `${remaining} left`}
+                                  </span>
+                                )}
+                              </div>
                             );
                           })() : <span className="text-muted-foreground">—</span>}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">{new Date(o.createdAt).toLocaleDateString()}</TableCell>
                         <TableCell className="text-right">
                           <Button variant="ghost" size="icon" onClick={() => setDetailOrder(o)}><Eye className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => {
+                            setEditOrder(o);
+                            setEditNotes(o.notes || '');
+                            setEditDueDate(o.paymentDueDate ? new Date(o.paymentDueDate).toISOString().slice(0, 16) : '');
+                            setEditStatus(o.status);
+                          }}><Pencil className="h-4 w-4" /></Button>
                         </TableCell>
                       </TableRow>
                     );
