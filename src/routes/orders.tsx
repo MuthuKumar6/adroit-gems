@@ -188,6 +188,18 @@ function OrdersPage() {
                             </SelectContent>
                           </Select>
                         </TableCell>
+                        <TableCell className="text-xs">
+                          {o.paymentDueDate ? (() => {
+                            const due = new Date(o.paymentDueDate);
+                            const today = new Date(); today.setHours(0,0,0,0);
+                            const overdue = o.status === 'pending' && due < today;
+                            return (
+                              <Badge variant={overdue ? 'destructive' : 'outline'}>
+                                {due.toLocaleDateString()}{overdue ? ' • Overdue' : ''}
+                              </Badge>
+                            );
+                          })() : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
                         <TableCell className="text-xs text-muted-foreground">{new Date(o.createdAt).toLocaleDateString()}</TableCell>
                         <TableCell className="text-right">
                           <Button variant="ghost" size="icon" onClick={() => setDetailOrder(o)}><Eye className="h-4 w-4" /></Button>
@@ -195,7 +207,7 @@ function OrdersPage() {
                       </TableRow>
                     );
                   })}
-                  {filtered.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No orders</TableCell></TableRow>}
+                  {filtered.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No orders</TableCell></TableRow>}
                 </TableBody>
               </Table>
             </div>
