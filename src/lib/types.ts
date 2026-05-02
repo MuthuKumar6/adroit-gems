@@ -13,6 +13,10 @@ export interface ProductType {
   id: string;
   productId: string; // links to Product
   name: string; // Bangles, Chains, Rings, Necklace, Earrings
+  hasSubName: boolean; // if true, sub names are auto-generated from tagNo
+  subNames: string[]; // sub names like CH-001, CH-002 (derived from tagNo)
+  tagNo: string; // Tag prefix e.g. "CH"
+  taxable: boolean; // Type: Taxable or Not
   huids: string[]; // HUID numbers
   grossWeight: number; // grams
   netWeight: number; // grams
@@ -63,6 +67,8 @@ export interface Order {
   gstAmount: number;
   totalAmount: number;
   notes: string;
+  paymentDueDate?: string; // ISO date — deadline to receive payment from customer
+  paymentReceived?: boolean; // marked true when money is received
   createdAt: string;
   updatedAt: string;
 }

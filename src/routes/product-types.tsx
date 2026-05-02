@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { productStore, productTypeStore } from "@/lib/store";
 import type { ProductType } from "@/lib/types";
 import { useState } from "react";
@@ -18,10 +19,16 @@ export const Route = createFileRoute("/product-types")({
 });
 
 const emptyForm = {
-  productId: '', name: '', huids: '', grossWeight: '', netWeight: '', stoneWeight: '0',
+  productId: '', name: '', tagNo: '', hasSubName: false, taxable: true,
+  huids: '', grossWeight: '', netWeight: '', stoneWeight: '0',
   wastagePercentage: '', makingCharges: '', makingChargeType: 'per_gram' as 'per_gram' | 'flat',
   description: '', quantity: '', inStock: '',
 };
+
+function generateSubNames(tagNo: string, qty: number): string[] {
+  if (!tagNo || qty <= 0) return [];
+  return Array.from({ length: qty }, (_, i) => `${tagNo}-${String(i + 1).padStart(3, '0')}`);
+}
 
 function ProductTypesPage() {
   const [items, setItems] = useState<ProductType[]>(productTypeStore.getAll());
@@ -36,7 +43,9 @@ function ProductTypesPage() {
   const openEdit = (pt: ProductType) => {
     setEditing(pt);
     setForm({
-      productId: pt.productId, name: pt.name, huids: pt.huids.join(', '),
+      productId: pt.productId, name: pt.name,
+      tagNo: pt.tagNo || '', hasSubName: pt.hasSubName ?? false, taxable: pt.taxable ?? true,
+      huids: pt.huids.join(', '),
       grossWeight: String(pt.grossWeight), netWeight: String(pt.netWeight), stoneWeight: String(pt.stoneWeight),
       wastagePercentage: String(pt.wastagePercentage), makingCharges: String(pt.makingCharges),
       makingChargeType: pt.makingChargeType, description: pt.description,
@@ -46,13 +55,16 @@ function ProductTypesPage() {
   };
 
   const handleSave = () => {
+    const qty = Number(form.quantity);
     const data = {
       productId: form.productId, name: form.name,
+      tagNo: form.tagNo, hasSubName: form.hasSubName, taxable: form.taxable,
+      subNames: form.hasSubName ? generateSubNames(form.tagNo, qty) : [],
       huids: form.huids.split(',').map(h => h.trim()).filter(Boolean),
       grossWeight: Number(form.grossWeight), netWeight: Number(form.netWeight),
       stoneWeight: Number(form.stoneWeight), wastagePercentage: Number(form.wastagePercentage),
       makingCharges: Number(form.makingCharges), makingChargeType: form.makingChargeType,
-      description: form.description, quantity: Number(form.quantity), inStock: Number(form.inStock),
+      description: form.description, quantity: qty, inStock: Number(form.inStock),
     };
     if (editing) { productTypeStore.update(editing.id, data); }
     else { productTypeStore.add(data); }
@@ -79,6 +91,8 @@ function ProductTypesPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
+                    <TableHead>Tag No.</TableHead>
+                    <TableHead>Type</TableHead>
                     <TableHead>Metal</TableHead>
                     <TableHead>HUIDs</TableHead>
                     <TableHead>Net Wt (g)</TableHead>
@@ -93,7 +107,18 @@ function ProductTypesPage() {
                     const product = productStore.getById(pt.productId);
                     return (
                       <TableRow key={pt.id}>
-                        <TableCell className="font-medium">{pt.name}</TableCell>
+                        <TableCell className="font-medium">
+                          {pt.name}
+                          {pt.hasSubName && pt.subNames?.length > 0 && (
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              {pt.subNames.slice(0, 2).join(', ')}{pt.subNames.length > 2 ? ` +${pt.subNames.length - 2}` : ''}
+                            </p>
+                          )}
+                        </TableCell>
+                        <TableCell><Badge variant="secondary">{pt.tagNo || '—'}</Badge></TableCell>
+                        <TableCell>
+                          <Badge variant={pt.taxable ? 'default' : 'outline'}>{pt.taxable ? 'Taxable' : 'Non-Tax'}</Badge>
+                        </TableCell>
                         <TableCell><Badge variant="outline">{product?.name} {product?.purity}</Badge></TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
@@ -116,7 +141,7 @@ function ProductTypesPage() {
                       </TableRow>
                     );
                   })}
-                  {items.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No product types</TableCell></TableRow>}
+                  {items.length === 0 && <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No product types</TableCell></TableRow>}
                 </TableBody>
               </Table>
             </div>
@@ -140,6 +165,35 @@ function ProductTypesPage() {
                 <Label>Type Name</Label>
                 <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Gold Ring, Silver Anklet" />
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-2">
+                  <Label>Tag No. (e.g. CH)</Label>
+                  <Input value={form.tagNo} onChange={e => setForm(f => ({ ...f, tagNo: e.target.value.toUpperCase() }))} placeholder="CH" />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Type</Label>
+                  <Select value={form.taxable ? 'taxable' : 'non_taxable'} onValueChange={v => setForm(f => ({ ...f, taxable: v === 'taxable' }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="taxable">Taxable</SelectItem>
+                      <SelectItem value="non_taxable">Not Taxable</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                <div>
+                  <Label>Sub Name</Label>
+                  <p className="text-xs text-muted-foreground">Auto-generate sub names from Tag No. (e.g. CH-001, CH-002 …)</p>
+                </div>
+                <Switch checked={form.hasSubName} onCheckedChange={v => setForm(f => ({ ...f, hasSubName: v }))} />
+              </div>
+              {form.hasSubName && form.tagNo && Number(form.quantity) > 0 && (
+                <div className="text-xs text-muted-foreground bg-accent/30 rounded p-2">
+                  Preview: {generateSubNames(form.tagNo, Number(form.quantity)).slice(0, 5).join(', ')}
+                  {Number(form.quantity) > 5 && ` … +${Number(form.quantity) - 5} more`}
+                </div>
+              )}
               <div className="grid gap-2">
                 <Label>HUIDs (comma separated)</Label>
                 <Input value={form.huids} onChange={e => setForm(f => ({ ...f, huids: e.target.value }))} placeholder="HUID001, HUID002" />

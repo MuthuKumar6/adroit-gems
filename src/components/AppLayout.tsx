@@ -1,4 +1,4 @@
-import { useLocation, useNavigate } from "@tanstack/react-router";
+import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import {
   LayoutDashboard, Package, Layers, Users, ShoppingCart,
@@ -70,9 +70,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           {navItems.map(({ to, label, icon: Icon }) => {
             const isActive = to === "/" ? location.pathname === "/" : location.pathname.startsWith(to);
             return (
-              <a
+              <Link
                 key={to}
-                href={to}
+                to={to}
                 onClick={() => setSidebarOpen(false)}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
                   isActive
@@ -87,7 +87,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     {unreadAlerts}
                   </Badge>
                 )}
-              </a>
+              </Link>
             );
           })}
         </nav>

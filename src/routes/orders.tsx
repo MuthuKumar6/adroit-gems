@@ -37,6 +37,7 @@ function OrdersPage() {
   const [customerId, setCustomerId] = useState('');
   const [orderItems, setOrderItems] = useState<{ productTypeId: string; quantity: number; huids: string }[]>([]);
   const [notes, setNotes] = useState('');
+  const [paymentDueDate, setPaymentDueDate] = useState('');
 
   const customers = customerStore.getAll();
   const productTypes = productTypeStore.getAll();
@@ -106,6 +107,8 @@ function OrdersPage() {
       gstAmount,
       totalAmount: subtotal + gstAmount,
       notes,
+      paymentDueDate: paymentDueDate || undefined,
+      paymentReceived: false,
     });
 
     refresh();
@@ -113,6 +116,7 @@ function OrdersPage() {
     setCustomerId('');
     setOrderItems([]);
     setNotes('');
+    setPaymentDueDate('');
     setLimitWarning('');
   };
 
@@ -157,6 +161,7 @@ function OrdersPage() {
                     <TableHead>Weight</TableHead>
                     <TableHead>Amount</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Payment Due</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -183,6 +188,18 @@ function OrdersPage() {
                             </SelectContent>
                           </Select>
                         </TableCell>
+                        <TableCell className="text-xs">
+                          {o.paymentDueDate ? (() => {
+                            const due = new Date(o.paymentDueDate);
+                            const today = new Date(); today.setHours(0,0,0,0);
+                            const overdue = o.status === 'pending' && due < today;
+                            return (
+                              <Badge variant={overdue ? 'destructive' : 'outline'}>
+                                {due.toLocaleDateString()}{overdue ? ' • Overdue' : ''}
+                              </Badge>
+                            );
+                          })() : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
                         <TableCell className="text-xs text-muted-foreground">{new Date(o.createdAt).toLocaleDateString()}</TableCell>
                         <TableCell className="text-right">
                           <Button variant="ghost" size="icon" onClick={() => setDetailOrder(o)}><Eye className="h-4 w-4" /></Button>
@@ -190,7 +207,7 @@ function OrdersPage() {
                       </TableRow>
                     );
                   })}
-                  {filtered.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No orders</TableCell></TableRow>}
+                  {filtered.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No orders</TableCell></TableRow>}
                 </TableBody>
               </Table>
             </div>
@@ -261,9 +278,16 @@ function OrdersPage() {
                 })}
               </div>
 
-              <div className="grid gap-2">
-                <Label>Notes</Label>
-                <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Additional notes..." />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-2">
+                  <Label>Notes</Label>
+                  <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Additional notes..." />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Payment Due Date</Label>
+                  <Input type="date" value={paymentDueDate} onChange={e => setPaymentDueDate(e.target.value)} min={new Date().toISOString().split('T')[0]} />
+                  <p className="text-[10px] text-muted-foreground">Alert shown on dashboard if pending past this date</p>
+                </div>
               </div>
             </div>
             <DialogFooter>
