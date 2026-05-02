@@ -30,8 +30,20 @@ function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>(orderStore.getAll());
   const [dialogOpen, setDialogOpen] = useState(false);
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
+  const [editOrder, setEditOrder] = useState<Order | null>(null);
+  const [editNotes, setEditNotes] = useState('');
+  const [editDueDate, setEditDueDate] = useState('');
+  const [editStatus, setEditStatus] = useState<Order['status']>('pending');
   const [statusFilter, setStatusFilter] = useState('all');
   const [limitWarning, setLimitWarning] = useState('');
+  const [, setNowTick] = useState(0);
+
+  // Re-render every second so overdue badges update live
+  useState(() => {
+    if (typeof window === 'undefined') return;
+    const t = setInterval(() => setNowTick(n => n + 1), 1000);
+    return () => clearInterval(t);
+  });
 
   // New order form
   const [customerId, setCustomerId] = useState('');
