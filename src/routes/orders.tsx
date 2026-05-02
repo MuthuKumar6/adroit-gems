@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { orderStore, customerStore, productTypeStore, productStore, restrictionStore, billStore } from "@/lib/store";
 import type { Order, OrderItem } from "@/lib/types";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Eye, ChevronRight, AlertTriangle, Pencil } from "lucide-react";
 
 export const Route = createFileRoute("/orders")({
