@@ -152,6 +152,35 @@ function ProductTypesPage() {
                 <Label>Type Name</Label>
                 <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Gold Ring, Silver Anklet" />
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-2">
+                  <Label>Tag No. (e.g. CH)</Label>
+                  <Input value={form.tagNo} onChange={e => setForm(f => ({ ...f, tagNo: e.target.value.toUpperCase() }))} placeholder="CH" />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Type</Label>
+                  <Select value={form.taxable ? 'taxable' : 'non_taxable'} onValueChange={v => setForm(f => ({ ...f, taxable: v === 'taxable' }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="taxable">Taxable</SelectItem>
+                      <SelectItem value="non_taxable">Not Taxable</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                <div>
+                  <Label>Sub Name</Label>
+                  <p className="text-xs text-muted-foreground">Auto-generate sub names from Tag No. (e.g. CH-001, CH-002 …)</p>
+                </div>
+                <Switch checked={form.hasSubName} onCheckedChange={v => setForm(f => ({ ...f, hasSubName: v }))} />
+              </div>
+              {form.hasSubName && form.tagNo && Number(form.quantity) > 0 && (
+                <div className="text-xs text-muted-foreground bg-accent/30 rounded p-2">
+                  Preview: {generateSubNames(form.tagNo, Number(form.quantity)).slice(0, 5).join(', ')}
+                  {Number(form.quantity) > 5 && ` … +${Number(form.quantity) - 5} more`}
+                </div>
+              )}
               <div className="grid gap-2">
                 <Label>HUIDs (comma separated)</Label>
                 <Input value={form.huids} onChange={e => setForm(f => ({ ...f, huids: e.target.value }))} placeholder="HUID001, HUID002" />
