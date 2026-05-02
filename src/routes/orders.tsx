@@ -384,6 +384,55 @@ function OrdersPage() {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Edit Order Dialog */}
+        <Dialog open={!!editOrder} onOpenChange={(o) => { if (!o) setEditOrder(null); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Order {editOrder?.orderNumber}</DialogTitle>
+              <DialogDescription>Update status, payment due date/time, and notes</DialogDescription>
+            </DialogHeader>
+            {editOrder && (
+              <div className="grid gap-4 py-2">
+                <div className="grid gap-2">
+                  <Label>Status</Label>
+                  <Select value={editStatus} onValueChange={(v) => setEditStatus(v as Order['status'])}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {['pending', 'approved', 'dispatched', 'delivered', 'cancelled', 'returned'].map(s => (
+                        <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label>Payment Due Date & Time</Label>
+                  <Input type="datetime-local" value={editDueDate} onChange={e => setEditDueDate(e.target.value)} />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Notes</Label>
+                  <Input value={editNotes} onChange={e => setEditNotes(e.target.value)} />
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditOrder(null)}>Cancel</Button>
+              <Button onClick={() => {
+                if (!editOrder) return;
+                // Status change uses updateStatus to keep stock side-effects
+                if (editStatus !== editOrder.status) {
+                  orderStore.updateStatus(editOrder.id, editStatus);
+                }
+                orderStore.update(editOrder.id, {
+                  notes: editNotes,
+                  paymentDueDate: editDueDate ? new Date(editDueDate).toISOString() : undefined,
+                });
+                setEditOrder(null);
+                refresh();
+              }}>Save Changes</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );
