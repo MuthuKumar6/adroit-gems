@@ -16,10 +16,13 @@ export const Route = createFileRoute("/")({
 
 function DashboardPage() {
   const [hydrated, setHydrated] = useState(false);
+  const [, setNowTick] = useState(0);
 
   useEffect(() => {
     initializeSeedData();
     setHydrated(true);
+    const t = setInterval(() => setNowTick(n => n + 1), 1000);
+    return () => clearInterval(t);
   }, []);
 
   const productTypes = hydrated ? productTypeStore.getAll() : [];
