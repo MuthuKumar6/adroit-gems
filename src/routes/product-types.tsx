@@ -91,6 +91,8 @@ function ProductTypesPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
+                    <TableHead>Tag No.</TableHead>
+                    <TableHead>Type</TableHead>
                     <TableHead>Metal</TableHead>
                     <TableHead>HUIDs</TableHead>
                     <TableHead>Net Wt (g)</TableHead>
