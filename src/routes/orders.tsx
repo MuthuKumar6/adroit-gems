@@ -319,9 +319,9 @@ function OrdersPage() {
                   <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Additional notes..." />
                 </div>
                 <div className="grid gap-2">
-                  <Label>Payment Due Date</Label>
-                  <Input type="date" value={paymentDueDate} onChange={e => setPaymentDueDate(e.target.value)} min={new Date().toISOString().split('T')[0]} />
-                  <p className="text-[10px] text-muted-foreground">Alert shown on dashboard if pending past this date</p>
+                  <Label>Payment Due Date & Time</Label>
+                  <Input type="datetime-local" value={paymentDueDate} onChange={e => setPaymentDueDate(e.target.value)} min={new Date().toISOString().slice(0, 16)} />
+                  <p className="text-[10px] text-muted-foreground">Live countdown shown; alert on dashboard when due today or overdue</p>
                 </div>
               </div>
             </div>
