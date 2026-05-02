@@ -265,9 +265,16 @@ function OrdersPage() {
                 })}
               </div>
 
-              <div className="grid gap-2">
-                <Label>Notes</Label>
-                <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Additional notes..." />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-2">
+                  <Label>Notes</Label>
+                  <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Additional notes..." />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Payment Due Date</Label>
+                  <Input type="date" value={paymentDueDate} onChange={e => setPaymentDueDate(e.target.value)} min={new Date().toISOString().split('T')[0]} />
+                  <p className="text-[10px] text-muted-foreground">Alert shown on dashboard if pending past this date</p>
+                </div>
               </div>
             </div>
             <DialogFooter>
