@@ -107,7 +107,18 @@ function ProductTypesPage() {
                     const product = productStore.getById(pt.productId);
                     return (
                       <TableRow key={pt.id}>
-                        <TableCell className="font-medium">{pt.name}</TableCell>
+                        <TableCell className="font-medium">
+                          {pt.name}
+                          {pt.hasSubName && pt.subNames?.length > 0 && (
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              {pt.subNames.slice(0, 2).join(', ')}{pt.subNames.length > 2 ? ` +${pt.subNames.length - 2}` : ''}
+                            </p>
+                          )}
+                        </TableCell>
+                        <TableCell><Badge variant="secondary">{pt.tagNo || '—'}</Badge></TableCell>
+                        <TableCell>
+                          <Badge variant={pt.taxable ? 'default' : 'outline'}>{pt.taxable ? 'Taxable' : 'Non-Tax'}</Badge>
+                        </TableCell>
                         <TableCell><Badge variant="outline">{product?.name} {product?.purity}</Badge></TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
