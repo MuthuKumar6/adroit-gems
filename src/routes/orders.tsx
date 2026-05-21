@@ -1,6 +1,7 @@
+
 import { createFileRoute } from "@tanstack/react-router";
 import { AppLayout } from "@/components/AppLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,10 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { orderStore, customerStore, productTypeStore, productStore, restrictionStore, billStore } from "@/lib/store";
-import type { Order, OrderItem } from "@/lib/types";
+import { orderStore, customerStore, productTypeStore, productStore, restrictionStore } from "@/lib/store";
+import type { Order, OrderItem, Customer, ProductType, Product } from "@/lib/types";
 import { useState, useEffect } from "react";
-import { Plus, Eye, ChevronRight, AlertTriangle, Pencil } from "lucide-react";
+import { Plus, Eye, Pencil, AlertTriangle, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/orders")({
   component: OrdersPage,
@@ -27,116 +28,173 @@ const statusColors: Record<string, string> = {
 };
 
 function OrdersPage() {
-  const [orders, setOrders] = useState<Order[]>(orderStore.getAll());
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [productTypes, setProductTypes] = useState<ProductType[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
   const [editOrder, setEditOrder] = useState<Order | null>(null);
   const [editNotes, setEditNotes] = useState('');
   const [editDueDate, setEditDueDate] = useState('');
   const [editStatus, setEditStatus] = useState<Order['status']>('pending');
+
   const [statusFilter, setStatusFilter] = useState('all');
   const [limitWarning, setLimitWarning] = useState('');
-  const [, setNowTick] = useState(0);
 
-  // Re-render every second so overdue badges/countdowns update live
-  useEffect(() => {
-    const t = setInterval(() => setNowTick(n => n + 1), 1000);
-    return () => clearInterval(t);
-  }, []);
-
-  // New order form
+  // New Order Form
   const [customerId, setCustomerId] = useState('');
   const [orderItems, setOrderItems] = useState<{ productTypeId: string; quantity: number; huids: string }[]>([]);
   const [notes, setNotes] = useState('');
   const [paymentDueDate, setPaymentDueDate] = useState('');
 
-  const customers = customerStore.getAll();
-  const productTypes = productTypeStore.getAll();
-  const refresh = () => setOrders(orderStore.getAll());
+  // Live timer
+  const [, setNowTick] = useState(0);
 
-  const filtered = statusFilter === 'all' ? orders : orders.filter(o => o.status === statusFilter);
+  useEffect(() => {
+    const timer = setInterval(() => setNowTick(n => n + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [ordersData, customersData, productTypesData, productsData] = await Promise.all([
+        orderStore.getAll(),
+        customerStore.getAll(),
+        productTypeStore.getAll(),
+        productStore.getAll()
+      ]);
+
+      setOrders(ordersData);
+      setCustomers(customersData);
+      setProductTypes(productTypesData);
+      setProducts(productsData);
+    } catch (err) {
+      console.error("Failed to fetch data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const filteredOrders = statusFilter === 'all'
+    ? orders
+    : orders.filter(o => o.status === statusFilter);
 
   const addItem = () => setOrderItems([...orderItems, { productTypeId: '', quantity: 1, huids: '' }]);
-  const removeItem = (i: number) => setOrderItems(orderItems.filter((_, idx) => idx !== i));
-  const updateItem = (i: number, field: string, value: string | number) => {
+
+  const removeItem = (index: number) => setOrderItems(orderItems.filter((_, i) => i !== index));
+
+  const updateItem = (index: number, field: string, value: string | number) => {
     const updated = [...orderItems];
-    (updated[i] as any)[field] = value;
+    (updated[index] as any)[field] = value;
     setOrderItems(updated);
   };
 
-  const handleCreate = () => {
-    if (!customerId || orderItems.length === 0) return;
-
-    // Check restrictions
-    let totalWeight = 0;
-    const items: OrderItem[] = orderItems.map(oi => {
-      const pt = productTypeStore.getById(oi.productTypeId);
-      const product = pt ? productStore.getById(pt.productId) : null;
-      const weight = pt ? pt.netWeight * oi.quantity : 0;
-      const rate = product ? product.currentRate : 0;
-      const making = pt ? (pt.makingChargeType === 'per_gram' ? pt.makingCharges * weight : pt.makingCharges * oi.quantity) : 0;
-      const amount = (weight * rate) + making;
-      totalWeight += weight;
-      return {
-        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-        productTypeId: oi.productTypeId,
-        quantity: oi.quantity,
-        huids: oi.huids.split(',').map(h => h.trim()).filter(Boolean),
-        weightGrams: weight,
-        ratePerGram: rate,
-        makingCharges: making,
-        amount,
-      };
-    });
-
-    // Check each product restriction
-    for (const item of items) {
-      const pt = productTypeStore.getById(item.productTypeId);
-      if (pt) {
-        const check = restrictionStore.checkLimit(customerId, pt.productId, item.weightGrams);
-        if (!check.allowed && check.limit > 0) {
-          setLimitWarning(`Limit exceeded! Customer used ${check.usedToday.toFixed(1)}g today out of ${check.limit}g limit. Cannot add ${item.weightGrams}g more.`);
-          return;
-        }
-        if (pt.inStock < item.quantity) {
-          setLimitWarning(`Insufficient stock for ${pt.name}. Available: ${pt.inStock}, Requested: ${item.quantity}`);
-          return;
-        }
-      }
+  const handleCreate = async () => {
+    if (!customerId || orderItems.length === 0) {
+      alert("Please select customer and add items");
+      return;
     }
 
-    const gstPct = 3;
-    const subtotal = items.reduce((s, i) => s + i.amount, 0);
-    const gstAmount = subtotal * (gstPct / 100);
-
-    orderStore.add({
-      customerId,
-      items,
-      status: 'pending',
-      totalWeight,
-      subtotal,
-      gstAmount,
-      totalAmount: subtotal + gstAmount,
-      notes,
-      paymentDueDate: paymentDueDate ? new Date(paymentDueDate).toISOString() : undefined,
-      paymentReceived: false,
-    });
-
-    refresh();
-    setDialogOpen(false);
-    setCustomerId('');
-    setOrderItems([]);
-    setNotes('');
-    setPaymentDueDate('');
+    setSaving(true);
     setLimitWarning('');
+
+    try {
+      let totalWeight = 0;
+      const finalItems: OrderItem[] = [];
+
+      for (const oi of orderItems) {
+        const pt = productTypes.find(p => p.id === oi.productTypeId);
+        if (!pt) continue;
+
+        const product = products.find(p => p.id === pt.product_id);
+        const weight = (pt.net_weight || 0) * oi.quantity;
+        const rate = product?.current_rate || 0;
+        const making = pt.making_charge_type === 'per_gram'
+          ? (pt.making_charges || 0) * weight
+          : (pt.making_charges || 0) * oi.quantity;
+        const amount = (weight * rate) + making;
+
+        totalWeight += weight;
+
+        const check = await restrictionStore.checkLimit(customerId, pt.product_id, weight);
+        if (!check.allowed && check.limit > 0) {
+          setLimitWarning(`Daily limit exceeded for this customer!`);
+          return;
+        }
+
+        if (pt.in_stock < oi.quantity) {
+          setLimitWarning(`Not enough stock for ${pt.name}`);
+          return;
+        }
+
+        finalItems.push({
+          id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+          productTypeId: oi.productTypeId,
+          quantity: oi.quantity,
+          huids: oi.huids.split(',').map(h => h.trim()).filter(Boolean),
+          weightGrams: weight,
+          ratePerGram: rate,
+          makingCharges: making,
+          amount,
+          product_type_id: oi.productTypeId,
+        });
+      }
+
+      const subtotal = finalItems.reduce((sum, i) => sum + i.amount, 0);
+      const gstAmount = subtotal * 0.03;
+
+      await orderStore.add({
+        customerId,
+        items: finalItems,
+        status: 'pending',
+        totalWeight,
+        subtotal,
+        gstAmount,
+        totalAmount: Number(subtotal) + Number(gstAmount),
+        notes: notes.trim(),
+        paymentDueDate: paymentDueDate ? new Date(paymentDueDate).toISOString() : undefined,
+        paymentReceived: false,
+      });
+
+      await fetchData();
+      setDialogOpen(false);
+      setCustomerId('');
+      setOrderItems([]);
+      setNotes('');
+      setPaymentDueDate('');
+    } catch (err) {
+      console.error(err);
+      alert("Failed to create order");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleStatusChange = (orderId: string, status: Order['status']) => {
-    orderStore.updateStatus(orderId, status);
-    refresh();
+  const handleStatusChange = async (orderId: string, status: Order['status']) => {
+    try {
+      // await orderStore.updateStatus(orderId, status);
+      // await fetchData();
+
+      console.log('Updating:', orderId, '→', status);  // ← add this
+      const result = await orderStore.updateStatus(orderId, status);
+      console.log('Result:', result);  // ← and this
+      await fetchData();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const detailCustomer = detailOrder ? customerStore.getById(detailOrder.customerId) : null;
+  const detailCustomer = detailOrder ? customers.find(c => c.id === detailOrder.customer_id) : null;
 
   return (
     <AppLayout>
@@ -146,12 +204,15 @@ function OrdersPage() {
             <h1 className="text-2xl lg:text-3xl font-heading font-bold gold-text">Orders</h1>
             <p className="text-muted-foreground text-sm mt-1">Manage wholesale orders with status tracking</p>
           </div>
-          <Button onClick={() => { setDialogOpen(true); setLimitWarning(''); addItem(); }}>
+          <Button onClick={() => {
+            setDialogOpen(true);
+            setLimitWarning('');
+            setOrderItems([{ productTypeId: '', quantity: 1, huids: '' }]);
+          }}>
             <Plus className="h-4 w-4 mr-2" /> New Order
           </Button>
         </div>
 
-        {/* Filter */}
         <div className="flex gap-2 flex-wrap">
           {['all', 'pending', 'approved', 'dispatched', 'delivered', 'cancelled'].map(s => (
             <Button key={s} variant={statusFilter === s ? 'default' : 'outline'} size="sm" onClick={() => setStatusFilter(s)} className="capitalize">
@@ -178,71 +239,55 @@ function OrdersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map(o => {
-                    const customer = customerStore.getById(o.customerId);
-                    return (
-                      <TableRow key={o.id}>
-                        <TableCell className="font-mono text-sm">{o.orderNumber}</TableCell>
-                        <TableCell className="font-medium">{customer?.name || 'Unknown'}</TableCell>
-                        <TableCell>{o.items.length}</TableCell>
-                        <TableCell>{o.totalWeight.toFixed(1)}g</TableCell>
-                        <TableCell>₹{o.totalAmount.toLocaleString('en-IN')}</TableCell>
-                        <TableCell>
-                          <Select value={o.status} onValueChange={(v) => handleStatusChange(o.id, v as Order['status'])}>
-                            <SelectTrigger className="w-28 h-7 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {['pending', 'approved', 'dispatched', 'delivered', 'cancelled', 'returned'].map(s => (
-                                <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          {o.paymentDueDate ? (() => {
-                            const due = new Date(o.paymentDueDate);
-                            const now = new Date();
-                            const startOfToday = new Date(); startOfToday.setHours(0,0,0,0);
-                            const endOfToday = new Date(); endOfToday.setHours(23,59,59,999);
-                            const isPending = o.status === 'pending';
-                            const overdue = isPending && due < now;
-                            const dueToday = isPending && due >= startOfToday && due <= endOfToday && due >= now;
-                            const diffMs = Math.abs(due.getTime() - now.getTime());
-                            const s = Math.floor(diffMs / 1000);
-                            const d = Math.floor(s / 86400);
-                            const h = Math.floor((s % 86400) / 3600);
-                            const m = Math.floor((s % 3600) / 60);
-                            const sec = s % 60;
-                            const remaining = d > 0 ? `${d}d ${h}h` : `${h}h ${m}m ${sec}s`;
-                            return (
-                              <div className="flex flex-col gap-0.5">
-                                <Badge variant={overdue ? 'destructive' : dueToday ? 'default' : 'outline'} className="w-fit">
-                                  {due.toLocaleDateString()} {due.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </Badge>
-                                {isPending && (
-                                  <span className={`font-mono text-[10px] ${overdue ? 'text-destructive' : dueToday ? 'text-warning' : 'text-muted-foreground'}`}>
-                                    {overdue ? `${remaining} late` : `${remaining} left`}
-                                  </span>
-                                )}
-                              </div>
-                            );
-                          })() : <span className="text-muted-foreground">—</span>}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{new Date(o.createdAt).toLocaleDateString()}</TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" onClick={() => setDetailOrder(o)}><Eye className="h-4 w-4" /></Button>
-                          <Button variant="ghost" size="icon" onClick={() => {
-                            setEditOrder(o);
-                            setEditNotes(o.notes || '');
-                            setEditDueDate(o.paymentDueDate ? new Date(o.paymentDueDate).toISOString().slice(0, 16) : '');
-                            setEditStatus(o.status);
-                          }}><Pencil className="h-4 w-4" /></Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                  {filtered.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No orders</TableCell></TableRow>}
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-12">
+                        <Loader2 className="animate-spin mx-auto h-6 w-6" />
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredOrders.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center text-muted-foreground py-12">No orders found</TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredOrders.map(o => {
+                      const customer = customers.find(c => c.id === o.customer_id);
+                      return (
+                        <TableRow key={o.id}>
+                          <TableCell className="font-mono text-sm">{o.order_number}</TableCell>
+                          <TableCell className="font-medium">{customer?.name || 'Unknown'}</TableCell>
+                          <TableCell>{o.items?.length ?? 0}</TableCell>
+                          <TableCell>{o.total_weight || '0.0'}g</TableCell>
+                          <TableCell>₹{o.total_amount?.toLocaleString('en-IN') ?? '0.00'}</TableCell>
+                          <TableCell>
+                            <Select value={o.status} onValueChange={(v) => handleStatusChange(o.id, v as Order['status'])}>
+                              <SelectTrigger className="w-28 h-7 text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {['pending', 'approved', 'dispatched', 'delivered', 'cancelled', 'returned'].map(s => (
+                                  <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            {o.payment_due_date ? new Date(o.payment_due_date).toLocaleDateString() : '—'}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {new Date(o.created_at).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell className="text-right space-x-1">
+                            <Button variant="ghost" size="icon" onClick={() => setDetailOrder(o)}><Eye className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" onClick={() => {
+                              setEditOrder(o);
+                              setEditNotes(o.notes || '');
+                              setEditDueDate(o.payment_due_date ? new Date(o.payment_due_date).toISOString().slice(0, 16) : '');
+                              setEditStatus(o.status);
+                            }}><Pencil className="h-4 w-4" /></Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
                 </TableBody>
               </Table>
             </div>
@@ -250,7 +295,13 @@ function OrdersPage() {
         </Card>
 
         {/* New Order Dialog */}
-        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setOrderItems([]); setLimitWarning(''); } }}>
+        <Dialog open={dialogOpen} onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) {
+            setOrderItems([]);
+            setLimitWarning('');
+          }
+        }}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create New Order</DialogTitle>
@@ -258,15 +309,14 @@ function OrdersPage() {
             </DialogHeader>
 
             {limitWarning && (
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm">
-                <AlertTriangle className="h-4 w-4 shrink-0" />
-                {limitWarning}
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive text-destructive text-sm">
+                <AlertTriangle className="h-4 w-4 shrink-0" />{limitWarning}
               </div>
             )}
 
-            <div className="grid gap-4 py-2">
+            <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label>Customer</Label>
+                <Label>Customer *</Label>
                 <Select value={customerId} onValueChange={setCustomerId}>
                   <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
                   <SelectContent>
@@ -280,156 +330,187 @@ function OrdersPage() {
                   <Label>Items</Label>
                   <Button variant="outline" size="sm" onClick={addItem}>+ Add Item</Button>
                 </div>
+
                 {orderItems.map((oi, i) => {
-                  const pt = productTypeStore.getById(oi.productTypeId);
+                  const pt = productTypes.find(p => p.id === oi.productTypeId);
                   return (
-                    <div key={i} className="grid grid-cols-12 gap-2 items-end p-3 rounded-lg bg-accent/20">
-                      <div className="col-span-5 grid gap-1">
+                    <div key={i} className="grid grid-cols-12 gap-2 items-end p-3 rounded-lg bg-accent/30">
+                      <div className="col-span-5">
                         <Label className="text-xs">Product Type</Label>
                         <Select value={oi.productTypeId} onValueChange={v => updateItem(i, 'productTypeId', v)}>
-                          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select" /></SelectTrigger>
+                          <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                           <SelectContent>
-                            {productTypes.filter(p => p.inStock > 0).map(p => (
-                              <SelectItem key={p.id} value={p.id}>{p.name} (Stock: {p.inStock})</SelectItem>
+                            {productTypes.filter(p => p.in_stock > 0).map(p => (
+                              <SelectItem key={p.id} value={p.id}>{p.name} (Stock: {p.in_stock})</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="col-span-2 grid gap-1">
+                      <div className="col-span-2">
                         <Label className="text-xs">Qty</Label>
-                        <Input type="number" className="h-8 text-xs" value={oi.quantity} min={1} max={pt?.inStock || 99}
-                          onChange={e => updateItem(i, 'quantity', Number(e.target.value))} />
+                        <Input type="number" value={oi.quantity} onChange={e => updateItem(i, 'quantity', Number(e.target.value))} />
                       </div>
-                      <div className="col-span-4 grid gap-1">
-                        <Label className="text-xs">HUIDs (comma sep)</Label>
-                        <Input className="h-8 text-xs" value={oi.huids} onChange={e => updateItem(i, 'huids', e.target.value)}
-                          placeholder={pt?.huids.slice(0, oi.quantity).join(', ')} />
+                      <div className="col-span-4">
+                        <Label className="text-xs">HUIDs</Label>
+                        <Input value={oi.huids} onChange={e => updateItem(i, 'huids', e.target.value)} placeholder="HUID001,HUID002" />
                       </div>
                       <div className="col-span-1">
-                        <Button variant="ghost" size="sm" className="h-8 text-xs text-destructive" onClick={() => removeItem(i)}>✕</Button>
+                        <Button variant="ghost" size="sm" className="text-destructive mt-5" onClick={() => removeItem(i)}>✕</Button>
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label>Notes</Label>
-                  <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Additional notes..." />
+                  <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Additional notes" />
                 </div>
                 <div className="grid gap-2">
-                  <Label>Payment Due Date & Time</Label>
-                  <Input type="datetime-local" value={paymentDueDate} onChange={e => setPaymentDueDate(e.target.value)} min={new Date().toISOString().slice(0, 16)} />
-                  <p className="text-[10px] text-muted-foreground">Live countdown shown; alert on dashboard when due today or overdue</p>
+                  <Label>Payment Due Date</Label>
+                  <Input type="datetime-local" value={paymentDueDate} onChange={e => setPaymentDueDate(e.target.value)} />
                 </div>
               </div>
             </div>
+
             <DialogFooter>
               <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleCreate}>Create Order</Button>
+              <Button onClick={handleCreate} disabled={saving}>
+                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Create Order
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
-        {/* Order Detail */}
-        <Dialog open={!!detailOrder} onOpenChange={() => setDetailOrder(null)}>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        {/* Order Detail Dialog */}
+        <Dialog open={!!detailOrder} onOpenChange={(open) => { if (!open) setDetailOrder(null); }}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Order {detailOrder?.orderNumber}</DialogTitle>
-              <DialogDescription>Created {detailOrder ? new Date(detailOrder.createdAt).toLocaleString() : ''}</DialogDescription>
+              <DialogTitle>Order Details — {detailOrder?.order_number}</DialogTitle>
+              <DialogDescription>
+                Customer: <strong>{detailCustomer?.name || 'Unknown'}</strong> &nbsp;|&nbsp; Status: <strong className="capitalize">{detailOrder?.status}</strong>
+              </DialogDescription>
             </DialogHeader>
-            {detailOrder && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <p className="text-muted-foreground">Customer</p>
-                    <p className="font-medium">{detailCustomer?.name}</p>
-                    <p className="text-xs text-muted-foreground">{detailCustomer?.phone}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Status</p>
-                    <Badge variant={statusColors[detailOrder.status] as any} className="capitalize">{detailOrder.status}</Badge>
-                  </div>
-                </div>
 
-                <div className="border-t border-border pt-3">
-                  <p className="text-sm font-medium mb-2">Items</p>
-                  {detailOrder.items.map(item => {
-                    const pt = productTypeStore.getById(item.productTypeId);
-                    return (
-                      <div key={item.id} className="flex justify-between p-2 rounded bg-accent/20 mb-2 text-sm">
-                        <div>
-                          <p className="font-medium">{pt?.name}</p>
-                          <p className="text-xs text-muted-foreground">Qty: {item.quantity} • {item.weightGrams}g • HUIDs: {item.huids.join(', ') || 'N/A'}</p>
-                        </div>
-                        <p className="font-medium">₹{item.amount.toLocaleString('en-IN')}</p>
-                      </div>
-                    );
-                  })}
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Total Weight</p>
+                  <p className="font-medium">{detailOrder?.total_weight || 0}g</p>
                 </div>
-
-                <div className="border-t border-border pt-3 space-y-1 text-sm">
-                  <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>₹{detailOrder.subtotal.toLocaleString('en-IN')}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">GST (3%)</span><span>₹{detailOrder.gstAmount.toLocaleString('en-IN')}</span></div>
-                  <div className="flex justify-between font-bold text-base border-t border-border pt-2">
-                    <span>Total</span><span className="text-primary">₹{detailOrder.totalAmount.toLocaleString('en-IN')}</span>
-                  </div>
+                <div>
+                  <p className="text-muted-foreground">Subtotal</p>
+                  <p className="font-medium">₹{detailOrder?.subtotal?.toLocaleString('en-IN') ?? 0}</p>
                 </div>
-
-                {detailOrder.notes && (
-                  <div className="text-sm"><span className="text-muted-foreground">Notes:</span> {detailOrder.notes}</div>
-                )}
+                <div>
+                  <p className="text-muted-foreground">GST (3%)</p>
+                  <p className="font-medium">₹{detailOrder?.gst_amount?.toLocaleString('en-IN') ?? 0}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Total Amount</p>
+                  <p className="font-semibold text-base">₹{detailOrder?.total_amount?.toLocaleString('en-IN') ?? 0}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Payment Due</p>
+                  <p className="font-medium">
+                    {detailOrder?.payment_due_date ? new Date(detailOrder.payment_due_date).toLocaleDateString() : '—'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Notes</p>
+                  <p className="font-medium">{detailOrder?.notes || '—'}</p>
+                </div>
               </div>
-            )}
+
+              <div>
+                <p className="text-sm font-semibold mb-2">Items</p>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Product Type</TableHead>
+                      <TableHead>Qty</TableHead>
+                      <TableHead>Weight</TableHead>
+                      <TableHead>Rate/g</TableHead>
+                      <TableHead>Making</TableHead>
+                      <TableHead>Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(detailOrder?.items ?? []).map((item: any) => {
+                      const pt = productTypes.find(p => p.id === (item.product_type_id || item.productTypeId));
+                      return (
+                        <TableRow key={item.id}>
+                          <TableCell>{pt?.name || item.product_type_id || '—'}</TableCell>
+                          <TableCell>{item.quantity}</TableCell>
+                          <TableCell>{item.weight_grams ?? item.weightGrams}g</TableCell>
+                          <TableCell>₹{item.rate_per_gram ?? item.ratePerGram}</TableCell>
+                          <TableCell>₹{item.making_charges ?? item.makingCharges}</TableCell>
+                          <TableCell>₹{item.amount?.toLocaleString('en-IN')}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDetailOrder(null)}>Close</Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 
         {/* Edit Order Dialog */}
-        <Dialog open={!!editOrder} onOpenChange={(o) => { if (!o) setEditOrder(null); }}>
+        <Dialog open={!!editOrder} onOpenChange={(open) => { if (!open) setEditOrder(null); }}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Edit Order {editOrder?.orderNumber}</DialogTitle>
-              <DialogDescription>Update status, payment due date/time, and notes</DialogDescription>
+              <DialogTitle>Edit Order — {editOrder?.order_number}</DialogTitle>
+              <DialogDescription>Update status, notes, or payment due date</DialogDescription>
             </DialogHeader>
-            {editOrder && (
-              <div className="grid gap-4 py-2">
-                <div className="grid gap-2">
-                  <Label>Status</Label>
-                  <Select value={editStatus} onValueChange={(v) => setEditStatus(v as Order['status'])}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {['pending', 'approved', 'dispatched', 'delivered', 'cancelled', 'returned'].map(s => (
-                        <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label>Payment Due Date & Time</Label>
-                  <Input type="datetime-local" value={editDueDate} onChange={e => setEditDueDate(e.target.value)} />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Notes</Label>
-                  <Input value={editNotes} onChange={e => setEditNotes(e.target.value)} />
-                </div>
+
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label>Status</Label>
+                <Select value={editStatus} onValueChange={(v) => setEditStatus(v as Order['status'])}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {['pending', 'approved', 'dispatched', 'delivered', 'cancelled', 'returned'].map(s => (
+                      <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            )}
+              <div className="grid gap-2">
+                <Label>Notes</Label>
+                <Input value={editNotes} onChange={e => setEditNotes(e.target.value)} placeholder="Additional notes" />
+              </div>
+              <div className="grid gap-2">
+                <Label>Payment Due Date</Label>
+                <Input type="datetime-local" value={editDueDate} onChange={e => setEditDueDate(e.target.value)} />
+              </div>
+            </div>
+
             <DialogFooter>
               <Button variant="outline" onClick={() => setEditOrder(null)}>Cancel</Button>
-              <Button onClick={() => {
+              <Button onClick={async () => {
                 if (!editOrder) return;
-                // Status change uses updateStatus to keep stock side-effects
-                if (editStatus !== editOrder.status) {
-                  orderStore.updateStatus(editOrder.id, editStatus);
+                setSaving(true);
+                try {
+                  await orderStore.updateStatus(editOrder.id, editStatus);
+                  await fetchData();
+                  setEditOrder(null);
+                } catch (err) {
+                  console.error(err);
+                  alert("Failed to update order");
+                } finally {
+                  setSaving(false);
                 }
-                orderStore.update(editOrder.id, {
-                  notes: editNotes,
-                  paymentDueDate: editDueDate ? new Date(editDueDate).toISOString() : undefined,
-                });
-                setEditOrder(null);
-                refresh();
-              }}>Save Changes</Button>
+              }} disabled={saving}>
+                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save Changes
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

@@ -1,118 +1,199 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router';
 import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { productStore, productTypeStore, customerStore, orderStore, billStore, alertStore, initializeSeedData } from "@/lib/store";
-import { useState, useEffect } from "react";
+import { productStore, productTypeStore, customerStore, orderStore, billStore, alertStore } from "@/lib/store";
+import { useState, useEffect, useCallback } from "react";
 import { Package, Users, ShoppingCart, TrendingUp, AlertTriangle, Warehouse, Clock, CheckCircle, Eye } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
+import type { Product, ProductType, Customer, Order, Bill } from "@/lib/types";
+import { log } from 'console';
 
 export const Route = createFileRoute("/")({
   component: DashboardPage,
 });
 
+// ── Lookup map types ────────────────────────────────────
+type CustomerMap = Record<string, Customer>;
+type ProductMap = Record<string, Product>;
+
 function DashboardPage() {
-  const [hydrated, setHydrated] = useState(false);
+  // ── All async data ──────────────────────────────────────
+  const [productTypes, setProductTypes] = useState<ProductType[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [bills, setBills] = useState<Bill[]>([]);
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [customerMap, setCustomerMap] = useState<CustomerMap>({});
+  const [productMap, setProductMap] = useState<ProductMap>({});
+  const [loading, setLoading] = useState(true);
+
+  // ── Countdown ticker (1s) ───────────────────────────────
   const [, setNowTick] = useState(0);
 
-  useEffect(() => {
-    initializeSeedData();
-    setHydrated(true);
-    const t = setInterval(() => setNowTick(n => n + 1), 1000);
-    return () => clearInterval(t);
+  const loadAll = useCallback(async () => {
+    const [ptRes, ordersRes, customersRes, billsRes, alertsRes, productsRes] =
+      await Promise.all([
+        productTypeStore.getAll(),
+        orderStore.getAll(),
+        customerStore.getAll(),
+        billStore.getAll(),
+        alertStore.getUnread(),
+        productStore.getAll(),
+      ]);
+
+    const pts: ProductType[] = Array.isArray(ptRes) ? ptRes : [];
+    const ords: Order[] = Array.isArray(ordersRes) ? ordersRes : [];
+    const custs: Customer[] = Array.isArray(customersRes) ? customersRes : [];
+    const bls: Bill[] = Array.isArray(billsRes) ? billsRes : [];
+    const alts: any[] = Array.isArray(alertsRes) ? alertsRes : [];
+    const prods: Product[] = Array.isArray(productsRes) ? productsRes : [];
+
+    setProductTypes(pts);
+    setOrders(ords);
+    setCustomers(custs);
+    setBills(bls);
+    setAlerts(alts);
+
+    const cMap: CustomerMap = {};
+    custs.forEach((c) => { cMap[c.id] = c; });
+    setCustomerMap(cMap);
+
+    const pMap: ProductMap = {};
+    prods.forEach((p) => { pMap[p.id] = p; });
+    setProductMap(pMap);
+
+    setLoading(false);
   }, []);
 
-  const productTypes = hydrated ? productTypeStore.getAll() : [];
-  const orders = hydrated ? orderStore.getAll() : [];
-  const customers = hydrated ? customerStore.getAll() : [];
-  const bills = hydrated ? billStore.getAll() : [];
-  const alerts = hydrated ? alertStore.getUnread() : [];
+  useEffect(() => {
+    loadAll();
+    const ticker = setInterval(() => setNowTick((n) => n + 1), 1000);
+    return () => clearInterval(ticker);
+  }, [loadAll]);
 
-  const totalRevenue = bills.reduce((s, b) => s + b.totalAmount, 0);
-  const totalStockWeight = productTypes.reduce((s, pt) => s + pt.inStock * pt.netWeight, 0);
-  const pendingOrdersCount = orders.filter(o => o.status === 'pending').length;
-  const lowStockCount = productTypes.filter(pt => pt.inStock <= 3).length;
+
+  // ── Derived values (all synchronous from state) ─────────
+  const totalRevenue = bills.reduce((s, b) => s + b.total_amount, 0);
+  const totalStockWeight = productTypes.reduce((s, pt) => s + pt.in_stock * pt.net_weight, 0);
+  const pendingOrdersCount = orders.filter((o) => o.status === 'pending').length;
+  const lowStockCount = productTypes.filter((pt) => pt.in_stock <= 3).length;
+
 
   const stats = [
     { label: "Total Product Types", value: productTypes.length, icon: Package, color: "text-primary" },
     { label: "Customers", value: customers.length, icon: Users, color: "text-chart-2" },
     { label: "Total Orders", value: orders.length, icon: ShoppingCart, color: "text-chart-3" },
-    { label: "Revenue", value: `₹${totalRevenue.toLocaleString('en-IN')}`, icon: TrendingUp, color: "text-chart-1" },
+    { label: "Revenue", value: `₹${Number(totalRevenue).toLocaleString()}`, icon: TrendingUp, color: "text-chart-1" },
     { label: "Total Stock Weight", value: `${totalStockWeight.toFixed(1)}g`, icon: Warehouse, color: "text-chart-5" },
     { label: "Pending Orders", value: pendingOrdersCount, icon: AlertTriangle, color: "text-warning" },
   ];
 
-  // Order Status Pie
   const orderStatusData = [
-    { name: 'Pending', value: orders.filter(o => o.status === 'pending').length },
-    { name: 'Approved', value: orders.filter(o => o.status === 'approved').length },
-    { name: 'Delivered', value: orders.filter(o => o.status === 'delivered').length },
-    { name: 'Cancelled', value: orders.filter(o => o.status === 'cancelled').length },
-  ].filter(d => d.value > 0);
+    { name: 'Pending', value: orders.filter((o) => o.status === 'pending').length },
+    { name: 'Approved', value: orders.filter((o) => o.status === 'approved').length },
+    { name: 'Delivered', value: orders.filter((o) => o.status === 'delivered').length },
+    { name: 'Cancelled', value: orders.filter((o) => o.status === 'cancelled').length },
+  ].filter((d) => d.value > 0);
 
   const PIE_COLORS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-5)'];
 
-  // === DETAILED INVENTORY PER PRODUCT TYPE ===
-  const inventoryData = productTypes.map(pt => {
-    const product = productStore.getById(pt.productId);
 
-    // Calculate ordered quantity for this product type (only pending + approved)
+  // ── Inventory table data ────────────────────────────────
+  const inventoryData = productTypes.map((pt) => {
     const orderedQty = orders
-      .filter(o => ['pending', 'approved'].includes(o.status))
+      .filter((o) => ['pending', 'approved'].includes(o.status))
       .reduce((sum, order) => {
-        const item = order.items.find(i => i.productTypeId === pt.id);
+        const item = order.items.find((i) => i.product_type_id === pt.id);
         return sum + (item?.quantity || 0);
       }, 0);
-
     return {
       ...pt,
-      productName: product?.name || 'Unknown',
-      inStock: pt.inStock,
+      productName: productMap[pt.product_id]?.name || 'Unknown',
       ordered: orderedQty,
-      availableAfterOrders: Math.max(0, pt.inStock - orderedQty),
+      availableAfterOrders: Math.max(0, pt.in_stock - orderedQty),
       totalQuantity: pt.quantity,
     };
   });
 
-  // For expandable ordered customers
+
+  // ── Reserved stock items ────────────────────────────────
+  const reservedStockItems = orders
+    .filter((o) => ['pending', 'approved'].includes(o.status))
+    .flatMap((order) =>
+      order.items.map((item) => {
+        const pt = productTypes.find((p) => p.id === item.product_type_id);
+        return {
+          orderNumber: order.order_number,
+          customerName: customerMap[order.customer_id]?.name || 'Unknown',
+          productTypeName: pt?.name || 'Unknown',
+          quantity: item.quantity,
+          netWeight: pt?.net_weight || 0,
+        };
+      })
+    );
+
+  // ── Expandable inventory rows ───────────────────────────
   const [expandedPt, setExpandedPt] = useState<string | null>(null);
 
-  const getOrdersForProductType = (productTypeId: string) => {
-    return orders
-      .filter(o => ['pending', 'approved'].includes(o.status))
-      .filter(o => o.items.some(item => item.productTypeId === productTypeId))
-      .map(order => {
-        const customer = customerStore.getById(order.customerId);
-        const item = order.items.find(i => i.productTypeId === productTypeId);
+  const getOrdersForProductType = (productTypeId: string) =>
+    orders
+      .filter((o) => ['pending', 'approved'].includes(o.status))
+      .filter((o) => o.items.some((item) => item.productTypeId === productTypeId))
+      .map((order) => {
+        const item = order.items.find((i) => i.productTypeId === productTypeId);
         return {
-          orderNumber: order.orderNumber,
-          customerName: customer?.name || 'Unknown',
-          customerPhone: customer?.phone,
+          orderNumber: order.order_number,
+          customerName: customerMap[order.customer_id]?.name || 'Unknown',
+          customerPhone: customerMap[order.customer_id]?.phone,
           quantity: item?.quantity || 0,
           status: order.status,
         };
       });
+
+  // ── Countdown helpers ───────────────────────────────────
+  const fmtCountdown = (ms: number) => {
+    if (ms <= 0) return '0s';
+    const s = Math.floor(ms / 1000);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    return `${h}h ${m}m ${sec}s`;
+  };
+  const fmtLate = (ms: number) => {
+    const s = Math.floor(ms / 1000);
+    const d = Math.floor(s / 86400);
+    const h = Math.floor((s % 86400) / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    if (d > 0) return `${d}d ${h}h late`;
+    if (h > 0) return `${h}h ${m}m late`;
+    return `${m}m late`;
   };
 
-  // For "Stock Reserved for Orders" section
-  const reservedStockItems = orders
-    .filter(o => ['pending', 'approved'].includes(o.status))
-    .flatMap(order => {
-      const customer = customerStore.getById(order.customerId);
-      return order.items.map(item => {
-        const pt = productTypes.find(p => p.id === item.productTypeId);
-        return {
-          orderNumber: order.orderNumber,
-          customerName: customer?.name || 'Unknown',
-          productTypeName: pt?.name || 'Unknown',
-          quantity: item.quantity,
-          netWeight: pt?.netWeight || 0,
-        };
-      });
-    });
+  // ── Loading state ───────────────────────────────────────
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-64 text-muted-foreground">
+          Loading dashboard…
+        </div>
+      </AppLayout>
+    );
+  }
+
+  const now = new Date();
+  const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+  const endOfToday = new Date(); endOfToday.setHours(23, 59, 59, 999);
+
+  const pendingWithDue = orders.filter((o) => o.status === 'pending' && o.payment_due_date);
+  const dueToday = pendingWithDue.filter((o) => {
+    const due = new Date(o.payment_due_date!);
+    return due >= startOfToday && due <= endOfToday && due >= now;
+  });
+  const overdue = pendingWithDue.filter((o) => new Date(o.payment_due_date!) < now);
 
   return (
     <AppLayout>
@@ -129,94 +210,67 @@ function DashboardPage() {
               <AlertTriangle className="h-4 w-4" />
               <span className="font-semibold">Stock Alerts ({alerts.length})</span>
             </div>
-            {alerts.slice(0, 3).map(a => (
+            {alerts.slice(0, 3).map((a) => (
               <p key={a.id} className="text-sm text-muted-foreground">{a.message}</p>
             ))}
           </div>
         )}
 
-        {/* Payment Due Today (with live countdown) + Overdue */}
-        {(() => {
-          const now = new Date();
-          const startOfToday = new Date(); startOfToday.setHours(0,0,0,0);
-          const endOfToday = new Date(); endOfToday.setHours(23,59,59,999);
-
-          const pending = orders.filter(o => o.status === 'pending' && o.paymentDueDate);
-          const dueToday = pending.filter(o => {
-            const due = new Date(o.paymentDueDate!);
-            return due >= startOfToday && due <= endOfToday && due >= now;
-          });
-          const overdue = pending.filter(o => new Date(o.paymentDueDate!) < now);
-
-          const fmtCountdown = (ms: number) => {
-            if (ms <= 0) return '0s';
-            const s = Math.floor(ms / 1000);
-            const h = Math.floor(s / 3600);
-            const m = Math.floor((s % 3600) / 60);
-            const sec = s % 60;
-            return `${h}h ${m}m ${sec}s`;
-          };
-          const fmtLate = (ms: number) => {
-            const s = Math.floor(ms / 1000);
-            const d = Math.floor(s / 86400);
-            const h = Math.floor((s % 86400) / 3600);
-            const m = Math.floor((s % 3600) / 60);
-            if (d > 0) return `${d}d ${h}h late`;
-            if (h > 0) return `${h}h ${m}m late`;
-            return `${m}m late`;
-          };
-
-          if (dueToday.length === 0 && overdue.length === 0) return null;
-          return (
-            <div className="space-y-3">
-              {dueToday.length > 0 && (
-                <div className="rounded-lg border border-warning/40 bg-warning/5 p-4">
-                  <div className="flex items-center gap-2 text-warning mb-2">
-                    <Clock className="h-4 w-4" />
-                    <span className="font-semibold">Payment Due Today ({dueToday.length})</span>
-                  </div>
-                  <div className="space-y-1">
-                    {dueToday.map(o => {
-                      const c = customerStore.getById(o.customerId);
-                      const due = new Date(o.paymentDueDate!);
-                      const remaining = due.getTime() - now.getTime();
-                      return (
-                        <p key={o.id} className="text-sm text-muted-foreground">
-                          <span className="font-medium text-foreground">{c?.name || 'Unknown'}</span> — Order {o.orderNumber} — ₹{o.totalAmount.toLocaleString('en-IN')} — Due at <span className="font-medium text-foreground">{due.toLocaleTimeString()}</span> — <span className="text-warning font-mono">{fmtCountdown(remaining)} left</span>
-                        </p>
-                      );
-                    })}
-                  </div>
+        {/* Payment Due Today / Overdue */}
+        {(dueToday.length > 0 || overdue.length > 0) && (
+          <div className="space-y-3">
+            {dueToday.length > 0 && (
+              <div className="rounded-lg border border-warning/40 bg-warning/5 p-4">
+                <div className="flex items-center gap-2 text-warning mb-2">
+                  <Clock className="h-4 w-4" />
+                  <span className="font-semibold">Payment Due Today ({dueToday.length})</span>
                 </div>
-              )}
-              {overdue.length > 0 && (
-                <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
-                  <div className="flex items-center gap-2 text-destructive mb-2">
-                    <Clock className="h-4 w-4" />
-                    <span className="font-semibold">Payment Overdue ({overdue.length})</span>
-                  </div>
-                  <div className="space-y-1">
-                    {overdue.slice(0, 5).map(o => {
-                      const c = customerStore.getById(o.customerId);
-                      const due = new Date(o.paymentDueDate!);
-                      const lateMs = now.getTime() - due.getTime();
-                      return (
-                        <p key={o.id} className="text-sm text-muted-foreground">
-                          <span className="font-medium text-foreground">{c?.name || 'Unknown'}</span> — Order {o.orderNumber} — ₹{o.totalAmount.toLocaleString('en-IN')} — <span className="text-destructive">Time limit is over ({fmtLate(lateMs)})</span>
-                        </p>
-                      );
-                    })}
-                    {overdue.length > 5 && <p className="text-xs text-muted-foreground">+ {overdue.length - 5} more overdue</p>}
-                  </div>
+                <div className="space-y-1">
+                  {dueToday.map((o) => {
+                    const due = new Date(o.payment_due_date!);
+                    const remaining = due.getTime() - now.getTime();
+                    return (
+                      <p key={o.id} className="text-sm text-muted-foreground">
+                        <span className="font-medium text-foreground">{customerMap[o.customer_id]?.name || 'Unknown'}</span>
+                        {' '}— Order {o.order_number} — ₹{o.total_amount.toLocaleString('en-IN')} — Due at{' '}
+                        <span className="font-medium text-foreground">{due.toLocaleTimeString()}</span>
+                        {' '}— <span className="text-warning font-mono">{fmtCountdown(remaining)} left</span>
+                      </p>
+                    );
+                  })}
                 </div>
-              )}
-            </div>
-          );
-        })()}
+              </div>
+            )}
+            {overdue.length > 0 && (
+              <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
+                <div className="flex items-center gap-2 text-destructive mb-2">
+                  <Clock className="h-4 w-4" />
+                  <span className="font-semibold">Payment Overdue ({overdue.length})</span>
+                </div>
+                <div className="space-y-1">
+                  {overdue.slice(0, 5).map((o) => {
+                    const due = new Date(o.payment_due_date!);
+                    const lateMs = now.getTime() - due.getTime();
+                    return (
+                      <p key={o.id} className="text-sm text-muted-foreground">
+                        <span className="font-medium text-foreground">{customerMap[o.customer_id]?.name || 'Unknown'}</span>
+                        {' '}— Order {o.order_number} — ₹{o.total_amount.toLocaleString('en-IN')}
+                        {' '}— <span className="text-destructive">Time limit is over ({fmtLate(lateMs)})</span>
+                      </p>
+                    );
+                  })}
+                  {overdue.length > 5 && (
+                    <p className="text-xs text-muted-foreground">+ {overdue.length - 5} more overdue</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Quick Stats */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          {stats.map(s => (
+          {stats.map((s) => (
             <Card key={s.label} className="glass-card">
               <CardContent className="p-4">
                 <s.icon className={`h-5 w-5 ${s.color} mb-2`} />
@@ -227,35 +281,9 @@ function DashboardPage() {
           ))}
         </div>
 
-        {/* Inventory Summary */}
-        {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="glass-card">
-            <CardHeader><CardTitle>Total Available Pieces</CardTitle></CardHeader>
-            <CardContent>
-              <p className="text-4xl font-bold">{productTypes.reduce((s, pt) => s + pt.inStock, 0)}</p>
-            </CardContent>
-          </Card>
-          <Card className="glass-card">
-            <CardHeader><CardTitle>Stock Reserved for Orders</CardTitle></CardHeader>
-            <CardContent>
-              <p className="text-4xl font-bold text-amber-600">
-                {orders
-                  .filter(o => ['pending', 'approved'].includes(o.status))
-                  .reduce((sum, o) => sum + o.items.reduce((iSum, i) => iSum + i.quantity, 0), 0)}
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="glass-card">
-            <CardHeader><CardTitle>Low Stock Items</CardTitle></CardHeader>
-            <CardContent>
-              <p className="text-4xl font-bold text-destructive">{lowStockCount}</p>
-            </CardContent>
-          </Card>
-        </div> */}
-
-        {/* === DETAILED SUMMARY CARDS === */}
+        {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* 1. Total Available Pieces - Detailed */}
+          {/* Total Available Pieces */}
           <Card className="glass-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -265,23 +293,23 @@ function DashboardPage() {
             </CardHeader>
             <CardContent>
               <p className="text-4xl font-bold mb-4">
-                {productTypes.reduce((s, pt) => s + pt.inStock, 0)}
+                {productTypes.reduce((s, pt) => s + pt.in_stock, 0)}
               </p>
               <div className="space-y-2 max-h-60 overflow-auto pr-2">
                 {productTypes
-                  .filter(pt => pt.inStock > 0)
-                  .sort((a, b) => b.inStock - a.inStock)
-                  .map(pt => (
+                  .filter((pt) => pt.in_stock > 0)
+                  .sort((a, b) => b.in_stock - a.in_stock)
+                  .map((pt) => (
                     <div key={pt.id} className="flex justify-between text-sm">
                       <span>{pt.name}</span>
-                      <span className="font-medium text-green-600">{pt.inStock} pcs</span>
+                      <span className="font-medium text-green-600">{pt.in_stock} pcs</span>
                     </div>
                   ))}
               </div>
             </CardContent>
           </Card>
 
-          {/* 2. Stock Reserved for Orders - Detailed */}
+          {/* Stock Reserved for Orders */}
           <Card className="glass-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -292,10 +320,9 @@ function DashboardPage() {
             <CardContent>
               <p className="text-4xl font-bold text-amber-600 mb-4">
                 {orders
-                  .filter(o => ['pending', 'approved'].includes(o.status))
+                  .filter((o) => ['pending', 'approved'].includes(o.status))
                   .reduce((sum, o) => sum + o.items.reduce((iSum, i) => iSum + i.quantity, 0), 0)}
               </p>
-
               {reservedStockItems.length > 0 ? (
                 <div className="space-y-3 max-h-60 overflow-auto">
                   {reservedStockItems.slice(0, 8).map((item, idx) => (
@@ -311,7 +338,9 @@ function DashboardPage() {
                     </div>
                   ))}
                   {reservedStockItems.length > 8 && (
-                    <p className="text-xs text-center text-muted-foreground">+ {reservedStockItems.length - 8} more reservations</p>
+                    <p className="text-xs text-center text-muted-foreground">
+                      + {reservedStockItems.length - 8} more reservations
+                    </p>
                   )}
                 </div>
               ) : (
@@ -320,7 +349,7 @@ function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* 3. Low Stock Items - Detailed */}
+          {/* Low Stock Items */}
           <Card className="glass-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -333,14 +362,14 @@ function DashboardPage() {
               {lowStockCount > 0 ? (
                 <div className="space-y-2">
                   {productTypes
-                    .filter(pt => pt.inStock <= 3)
-                    .map(pt => (
+                    .filter((pt) => pt.in_stock <= 3)
+                    .map((pt) => (
                       <div key={pt.id} className="flex justify-between p-2 bg-destructive/5 border border-destructive/20 rounded">
                         <div>
                           <p className="font-medium text-sm">{pt.name}</p>
-                          <p className="text-xs text-muted-foreground">{pt.netWeight}g each</p>
+                          <p className="text-xs text-muted-foreground">{pt.net_weight}g each</p>
                         </div>
-                        <Badge variant="destructive" className="self-center">{pt.inStock} left</Badge>
+                        <Badge variant="destructive" className="self-center">{pt.in_stock} left</Badge>
                       </div>
                     ))}
                 </div>
@@ -353,7 +382,6 @@ function DashboardPage() {
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Stock Levels Bar Chart */}
           <Card className="glass-card">
             <CardHeader><CardTitle>Stock Levels by Product Type</CardTitle></CardHeader>
             <CardContent className="h-80">
@@ -363,14 +391,13 @@ function DashboardPage() {
                   <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                   <YAxis />
                   <Tooltip />
-                  <Bar dataKey="inStock" fill="var(--chart-1)" name="In Stock" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="in_stock" fill="var(--chart-1)" name="In Stock" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="ordered" fill="var(--chart-3)" name="Ordered" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
 
-          {/* Order Status Pie */}
           <Card className="glass-card">
             <CardHeader><CardTitle>Order Status</CardTitle></CardHeader>
             <CardContent className="h-80 flex flex-col items-center justify-center">
@@ -395,12 +422,14 @@ function DashboardPage() {
                     ))}
                   </div>
                 </>
-              ) : <p>No orders placed yet</p>}
+              ) : (
+                <p>No orders placed yet</p>
+              )}
             </CardContent>
           </Card>
         </div>
 
-        {/* === MAIN INVENTORY TABLE - Total Qty with Ordered / Unordered === */}
+        {/* Inventory Overview Table */}
         <Card className="glass-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -425,19 +454,23 @@ function DashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {inventoryData.map(pt => {
+                {inventoryData.map((pt) => {
                   const hasOrders = pt.ordered > 0;
                   const isExpanded = expandedPt === pt.id;
                   const orderedCustomers = getOrdersForProductType(pt.id);
+                  console.log("product type", pt.name, "ordered customers", orderedCustomers); // 👈 --- IGNORE ---
 
                   return (
                     <>
-                      <TableRow key={pt.id} className={hasOrders ? "cursor-pointer hover:bg-accent/50" : ""}
-                        onClick={() => hasOrders && setExpandedPt(isExpanded ? null : pt.id)}>
+                      <TableRow
+                        key={pt.id}
+                        className={hasOrders ? "cursor-pointer hover:bg-accent/50" : ""}
+                        onClick={() => hasOrders && setExpandedPt(isExpanded ? null : pt.id)}
+                      >
                         <TableCell className="font-medium">{pt.name}</TableCell>
                         <TableCell className="text-muted-foreground">{pt.productName}</TableCell>
                         <TableCell className="text-right font-medium">{pt.totalQuantity}</TableCell>
-                        <TableCell className="text-right font-medium text-green-600">{pt.inStock}</TableCell>
+                        <TableCell className="text-right font-medium text-green-600">{pt.in_stock}</TableCell>
                         <TableCell className="text-right font-medium text-amber-600">
                           {pt.ordered > 0 ? pt.ordered : '—'}
                         </TableCell>
@@ -451,13 +484,14 @@ function DashboardPage() {
                         </TableCell>
                       </TableRow>
 
-                      {/* Expanded Customer Details */}
                       {hasOrders && isExpanded && (
-                        <TableRow>
+                        <TableRow key={`${pt.id}-expanded`}>
                           <TableCell colSpan={7} className="p-0 bg-muted/30">
                             <Collapsible open={isExpanded}>
                               <CollapsibleContent className="p-4 border-t">
-                                <p className="text-sm font-medium mb-3">Customers who ordered <span className="text-amber-600">{pt.name}</span></p>
+                                <p className="text-sm font-medium mb-3">
+                                  Customers who ordered <span className="text-amber-600">{pt.name}</span>
+                                </p>
                                 <Table>
                                   <TableHeader>
                                     <TableRow>
@@ -497,50 +531,47 @@ function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Recent Orders & Low Stock Side-by-side */}
+        {/* Recent Orders & Low Stock */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Recent Orders */}
           <Card className="glass-card">
             <CardHeader><CardTitle>Recent Orders</CardTitle></CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {orders.slice(-6).reverse().map(o => {
-                  const customer = customerStore.getById(o.customerId);
-                  return (
-                    <a key={o.id} href="/orders" className="block p-3 rounded-lg hover:bg-accent/50 transition-all">
-                      <div className="flex justify-between">
-                        <div>
-                          <p className="font-medium">{o.orderNumber}</p>
-                          <p className="text-sm text-muted-foreground">{customer?.name}</p>
-                        </div>
-                        <div className="text-right">
-                          <p>₹{o.totalAmount.toLocaleString('en-IN')}</p>
-                          <Badge variant={o.status === 'pending' ? "outline" : o.status === 'cancelled' ? "destructive" : "default"}>
-                            {o.status}
-                          </Badge>
-                        </div>
+                {orders.slice(-6).reverse().map((o) => (
+                  <a key={o.id} href="/orders" className="block p-3 rounded-lg hover:bg-accent/50 transition-all">
+                    <div className="flex justify-between">
+                      <div>
+                        <p className="font-medium">{o.order_number}</p>
+                        <p className="text-sm text-muted-foreground">{customerMap[o.customer_id]?.name}</p>
                       </div>
-                    </a>
-                  );
-                })}
-                {orders.length === 0 && <p className="text-center py-8 text-muted-foreground">No orders yet</p>}
+                      <div className="text-right">
+                        <p>₹{o.total_amount.toLocaleString('en-IN')}</p>
+                        <Badge variant={o.status === 'pending' ? "outline" : o.status === 'cancelled' ? "destructive" : "default"}>
+                          {o.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  </a>
+                ))}
+                {orders.length === 0 && (
+                  <p className="text-center py-8 text-muted-foreground">No orders yet</p>
+                )}
               </div>
             </CardContent>
           </Card>
 
-          {/* Low Stock */}
           <Card className="glass-card">
             <CardHeader><CardTitle>Low Stock Items</CardTitle></CardHeader>
             <CardContent>
               {lowStockCount > 0 ? (
                 <div className="space-y-3">
-                  {productTypes.filter(pt => pt.inStock <= 3).map(pt => (
+                  {productTypes.filter((pt) => pt.in_stock <= 3).map((pt) => (
                     <div key={pt.id} className="flex justify-between items-center p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
                       <div>
                         <p className="font-medium">{pt.name}</p>
-                        <p className="text-xs text-muted-foreground">{pt.netWeight}g each</p>
+                        <p className="text-xs text-muted-foreground">{pt.net_weight}g each</p>
                       </div>
-                      <Badge variant="destructive">{pt.inStock} left</Badge>
+                      <Badge variant="destructive">{pt.in_stock} left</Badge>
                     </div>
                   ))}
                 </div>

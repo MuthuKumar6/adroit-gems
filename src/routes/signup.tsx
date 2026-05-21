@@ -1,11 +1,11 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { auth } from "@/lib/auth";
+import { api } from "@/lib/api";           // ← Correct import
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Gem, AlertTriangle } from "lucide-react";
+import { Gem, AlertTriangle, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/signup")({
   component: SignupPage,
@@ -13,19 +13,47 @@ export const Route = createFileRoute("/signup")({
 
 function SignupPage() {
   const navigate = useNavigate();
+  
   const [shopName, setShopName] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // ✅ FIXED: Made async + await
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    const res = auth.signup({ shopName, ownerName, email, phone, password });
-    if (!res.ok) { setError(res.error); return; }
-    navigate({ to: "/" });
+    setLoading(true);
+
+    try {
+      const res = await api.auth.signup({ 
+        shopName, 
+        ownerName, 
+        email, 
+        phone, 
+        password 
+      });
+
+      console.log("✅ Signup Response:", res);
+
+      if (res.ok) {
+        localStorage.setItem("token", res.token);
+        localStorage.setItem("currentShop", JSON.stringify(res.shop));
+
+        alert("Shop created successfully! 🎉");
+        navigate({ to: "/" });   // Change to your dashboard route
+      } else {
+        setError(res.error || "Signup failed. Please try again.");
+      }
+    } catch (err: any) {
+      console.error("Signup Error:", err);
+      setError("Cannot connect to server. Make sure backend is running on port 5000.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -38,6 +66,7 @@ function SignupPage() {
           <CardTitle className="font-heading text-2xl gold-text">Create your shop</CardTitle>
           <p className="text-sm text-muted-foreground mt-1">Start managing your jewellery business</p>
         </CardHeader>
+
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
@@ -45,32 +74,70 @@ function SignupPage() {
                 <AlertTriangle className="h-4 w-4 shrink-0" />{error}
               </div>
             )}
+
             <div className="grid gap-2">
               <Label>Shop Name *</Label>
-              <Input value={shopName} onChange={e => setShopName(e.target.value)} placeholder="Sharma Jewellers" required />
+              <Input 
+                value={shopName} 
+                onChange={e => setShopName(e.target.value)} 
+                placeholder="Sharma Jewellers" 
+                required 
+              />
             </div>
+
             <div className="grid gap-2">
               <Label>Owner Name</Label>
-              <Input value={ownerName} onChange={e => setOwnerName(e.target.value)} placeholder="Rajesh Sharma" />
+              <Input 
+                value={ownerName} 
+                onChange={e => setOwnerName(e.target.value)} 
+                placeholder="Rajesh Sharma" 
+              />
             </div>
+
             <div className="grid gap-2">
               <Label>Email *</Label>
-              <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="shop@example.com" required />
+              <Input 
+                type="email" 
+                value={email} 
+                onChange={e => setEmail(e.target.value)} 
+                placeholder="shop@example.com" 
+                required 
+              />
             </div>
+
             <div className="grid gap-2">
               <Label>Phone</Label>
-              <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="9876543210" />
+              <Input 
+                value={phone} 
+                onChange={e => setPhone(e.target.value)} 
+                placeholder="9876543210" 
+              />
             </div>
+
             <div className="grid gap-2">
               <Label>Password * <span className="text-xs text-muted-foreground">(min 4 chars)</span></Label>
-              <Input type="password" value={password} onChange={e => setPassword(e.target.value)} required />
+              <Input 
+                type="password" 
+                value={password} 
+                onChange={e => setPassword(e.target.value)} 
+                required 
+              />
             </div>
-            <Button type="submit" className="w-full">Create Shop</Button>
+
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating Shop...
+                </>
+              ) : (
+                "Create Shop"
+              )}
+            </Button>
+
             <p className="text-sm text-center text-muted-foreground">
-              Already have a shop? <Link to="/login" className="text-primary hover:underline">Sign in</Link>
-            </p>
-            <p className="text-xs text-center text-muted-foreground/70 pt-2 border-t border-border/40">
-              Demo mode: data is stored in this browser only. Each shop's data is fully isolated.
+              Already have a shop?{" "}
+              <Link to="/login" className="text-primary hover:underline">Sign in</Link>
             </p>
           </form>
         </CardContent>

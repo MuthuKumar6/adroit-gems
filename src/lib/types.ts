@@ -2,8 +2,8 @@ export interface Product {
   id: string;
   name: string; // Gold, Silver
   purity: string; // 24K, 22K, 18K, 999, 925
-  currentRate: number; // per gram
-  gstPercentage: number; // 3% for gold/silver
+  current_rate: number; // per gram
+  gst_percentage: number; // 3% for gold/silver
   unit: string; // gram
   createdAt: string;
   updatedAt: string;
@@ -11,24 +11,26 @@ export interface Product {
 
 export interface ProductType {
   id: string;
-  productId: string; // links to Product
-  name: string; // Bangles, Chains, Rings, Necklace, Earrings
-  hasSubName: boolean; // if true, sub names are auto-generated from tagNo
-  subNames: string[]; // sub names like CH-001, CH-002 (derived from tagNo)
-  tagNo: string; // Tag prefix e.g. "CH"
-  taxable: boolean; // Type: Taxable or Not
-  huids: string[]; // HUID numbers
-  grossWeight: number; // grams
-  netWeight: number; // grams
-  stoneWeight: number; // grams
-  wastagePercentage: number;
-  makingCharges: number; // per gram or flat
-  makingChargeType: 'per_gram' | 'flat';
+  name: string;
+  product_id: string;        // was: productId
+  productName: string;       // joined/derived, keep as-is
+  purity: string;            // joined from Product, add this
+  has_sub_name: boolean;     // was: hasSubName (also stored as 0|1, handle with Boolean())
+  sub_names: string[];       // was: subNames
+  tag_no: string;            // ✅ already correct
+  taxable: boolean;          // stored as 0|1 integer, handle with Boolean()
+  huids: string[];           // stored as stringified JSON, use toArray()
+  gross_weight: number;      // was: grossWeight
+  net_weight: number;        // ✅ already correct
+  stone_weight: number;      // was: stoneWeight
+  wastage_percentage: number; // ✅ already correct
+  making_charges: number;    // ✅ already correct
+  making_charge_type: 'per_gram' | 'flat'; // ✅ already correct
   description: string;
-  quantity: number; // total pieces (each piece = 1 HUID ideally, but can be multiple)
-  inStock: number; // currently available
-  createdAt: string;
-  updatedAt: string;
+  quantity: number;
+  in_stock: number;          // ✅ already correct
+  created_at: string;        // was: createdAt
+  updated_at: string;        // was: updatedAt
 }
 
 export interface Customer {
@@ -38,7 +40,7 @@ export interface Customer {
   email: string;
   address: string;
   gstin: string;
-  dailyGramLimit: number; // restriction: max grams per day
+  daily_gram_limit: number; // restriction: max grams per day
   createdAt: string;
   updatedAt: string;
 }
@@ -46,6 +48,7 @@ export interface Customer {
 export type OrderStatus = 'pending' | 'approved' | 'dispatched' | 'delivered' | 'cancelled' | 'returned';
 
 export interface OrderItem {
+  // product_type_id: string;
   id: string;
   productTypeId: string;
   quantity: number;
@@ -54,27 +57,30 @@ export interface OrderItem {
   ratePerGram: number;
   makingCharges: number;
   amount: number; // before GST
+  product_type_id: string; // added for easier access in some places, can be removed if redundant
 }
 
 export interface Order {
   id: string;
-  orderNumber: string;
-  customerId: string;
+  product_type_id: any;
+  order_number: string;
+  customer_id: string;
   items: OrderItem[];
   status: OrderStatus;
-  totalWeight: number;
+  total_weight: number;
   subtotal: number;
-  gstAmount: number;
-  totalAmount: number;
+  gst_amount: number;
+  total_amount: number;
   notes: string;
-  paymentDueDate?: string; // ISO date — deadline to receive payment from customer
-  paymentReceived?: boolean; // marked true when money is received
-  createdAt: string;
-  updatedAt: string;
+  payment_due_date?: string; // ISO date — deadline to receive payment from customer
+  payment_received?: boolean; // marked true when money is received
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Bill {
   id: string;
+  total_amount: any,
   billNumber: string;
   orderId: string;
   customerId: string;
@@ -89,14 +95,16 @@ export interface Bill {
   paymentMethod: 'cash' | 'bank_transfer' | 'cheque' | 'upi';
   status: 'paid' | 'partial' | 'unpaid';
   createdAt: string;
+  gst_amount: any;
+  balance_amount: any;
 }
 
 export interface Restriction {
   id: string;
-  customerId: string;
-  productId: string;
-  dailyGramLimit: number;
-  isActive: boolean;
+  customer_id: string;
+  product_id: string;
+  daily_gram_limit: number;
+  is_active: boolean;
   createdAt: string;
 }
 

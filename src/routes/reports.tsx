@@ -5,50 +5,117 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { orderStore, customerStore, productTypeStore, productStore, billStore } from "@/lib/store";
+import type { Order, Bill, Customer, ProductType, Product } from "@/lib/types";
 import { useState, useEffect } from "react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
-import { FileText, Download } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { FileText, Download, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/reports")({
   component: ReportsPage,
 });
 
 function ReportsPage() {
-  const [, setTick] = useState(0);
-  useEffect(() => setTick(1), []);
+  const [reportType, setReportType] = useState<'sales' | 'customer' | 'product' | 'orders'>('sales');
 
-  const [reportType, setReportType] = useState('sales');
-  const orders = orderStore.getAll();
-  const bills = billStore.getAll();
-  const customers = customerStore.getAll();
-  const productTypes = productTypeStore.getAll();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [bills, setBills] = useState<Bill[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [productTypes, setProductTypes] = useState<ProductType[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
 
-  // Sales summary
-  const totalSales = bills.reduce((s, b) => s + b.totalAmount, 0);
-  const totalGST = bills.reduce((s, b) => s + b.gstAmount, 0);
-  const totalDiscount = bills.reduce((s, b) => s + b.discount, 0);
-  const totalPending = bills.reduce((s, b) => s + b.balanceAmount, 0);
+  const [loading, setLoading] = useState(true);
 
-  // Sales by customer
-  const salesByCustomer = customers.map(c => {
-    const cBills = bills.filter(b => b.customerId === c.id);
-    return { name: c.name, total: cBills.reduce((s, b) => s + b.totalAmount, 0), orders: cBills.length };
-  }).filter(c => c.total > 0).sort((a, b) => b.total - a.total);
+  // Fetch all data
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [ordersData, billsData, customersData, productTypesData, productsData] = await Promise.all([
+        orderStore.getAll(),
+        billStore.getAll(),
+        customerStore.getAll(),
+        productTypeStore.getAll(),
+        productStore.getAll(),
+      ]);
 
-  // Sales by product type
-  const salesByProduct = productTypes.map(pt => {
-    const product = productStore.getById(pt.productId);
-    let totalQty = 0, totalAmt = 0;
-    orders.forEach(o => o.items.forEach(i => { if (i.productTypeId === pt.id) { totalQty += i.quantity; totalAmt += i.amount; } }));
-    return { name: pt.name, metal: product?.name || '', qty: totalQty, amount: totalAmt };
-  }).filter(p => p.qty > 0);
+      setOrders(ordersData);
+      setBills(billsData);
+      setCustomers(customersData);
+      setProductTypes(productTypesData);
+      setProducts(productsData);
+    } catch (err) {
+      console.error("Failed to load reports data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // Order status
-  const statusSummary = ['pending', 'approved', 'dispatched', 'delivered', 'cancelled'].map(s => ({
-    status: s, count: orders.filter(o => o.status === s).length,
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  console.log("bills", bills); // 👈 --- IGNORE ---
+
+  // Sales Summary
+  const totalSales = bills.reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0);
+  const totalGST = bills.reduce((sum, b) => sum + (Number(b.gst_amount) || 0), 0);
+  const totalDiscount = bills.reduce((sum, b) => sum + (Number(b.discount) || 0), 0);
+  const totalPending = bills.reduce((sum, b) => sum + (Number(b.balance_amount) || 0), 0);
+
+  // Sales by Customer
+  const salesByCustomer = customers
+    .map(c => {
+      const customerBills = bills.filter(b => b.customer_id === c.id);
+      return {
+        name: c.name,
+        total: customerBills.reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0),
+        orders: customerBills.length,
+      };
+    })
+    .filter(c => c.total > 0)
+    .sort((a, b) => b.total - a.total);
+
+  // Sales by Product Type
+  const salesByProduct = productTypes
+    .map(pt => {
+      const product = products.find(p => p.id === pt.product_id);
+      let totalQty = 0;
+      let totalAmt = 0;
+
+      orders.forEach(order => {
+        order.items.forEach(item => {
+          if (item.product_type_id === pt.id) {
+            totalQty += item.quantity;
+            totalAmt += Number(item.amount) || 0;
+          }
+        });
+      });
+
+      return {
+        name: pt.name,
+        metal: product?.name || '',
+        qty: totalQty,
+        amount: totalAmt,
+      };
+    })
+    .filter(p => p.qty > 0);
+
+  // Order Status Summary
+  const statusSummary = ['pending', 'approved', 'dispatched', 'delivered', 'cancelled', 'returned'].map(status => ({
+    status,
+    count: orders.filter(o => o.status === status).length,
   }));
 
-  const PIE_COLORS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)'];
+  const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -58,45 +125,51 @@ function ReportsPage() {
             <h1 className="text-2xl lg:text-3xl font-heading font-bold gold-text">Reports</h1>
             <p className="text-muted-foreground text-sm mt-1">Business analytics and reports</p>
           </div>
-          <Select value={reportType} onValueChange={setReportType}>
-            <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+          <Select value={reportType} onValueChange={(value: any) => setReportType(value)}>
+            <SelectTrigger className="w-52">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="sales">Sales Report</SelectItem>
               <SelectItem value="customer">Customer Report</SelectItem>
               <SelectItem value="product">Product Report</SelectItem>
-              <SelectItem value="orders">Order Report</SelectItem>
+              <SelectItem value="orders">Order Status</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
+        {/* Sales Report */}
         {reportType === 'sales' && (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { label: 'Total Sales', value: `₹${totalSales.toLocaleString('en-IN')}` },
-                { label: 'GST Collected', value: `₹${totalGST.toLocaleString('en-IN')}` },
-                { label: 'Discounts Given', value: `₹${totalDiscount.toLocaleString('en-IN')}` },
-                { label: 'Pending Payments', value: `₹${totalPending.toLocaleString('en-IN')}` },
-              ].map(s => (
-                <Card key={s.label} className="glass-card border-border/50">
-                  <CardContent className="p-4 text-center">
-                    <p className="text-lg font-bold font-heading">{s.value}</p>
-                    <p className="text-xs text-muted-foreground">{s.label}</p>
+                { label: "Total Sales", value: `₹${totalSales.toLocaleString('en-IN')}` },
+                { label: "GST Collected", value: `₹${totalGST.toLocaleString('en-IN')}` },
+                { label: "Discounts", value: `₹${totalDiscount.toLocaleString('en-IN')}` },
+                { label: "Pending Payments", value: `₹${totalPending.toLocaleString('en-IN')}` },
+              ].map(item => (
+                <Card key={item.label} className="glass-card border-border/50">
+                  <CardContent className="p-6 text-center">
+                    <p className="text-2xl font-bold font-heading">{item.value}</p>
+                    <p className="text-sm text-muted-foreground mt-1">{item.label}</p>
                   </CardContent>
                 </Card>
               ))}
             </div>
+
             <Card className="glass-card border-border/50">
-              <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Sales by Customer</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle>Sales by Customer</CardTitle>
+              </CardHeader>
               <CardContent>
-                <div className="h-64">
+                <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={salesByCustomer}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                      <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} />
-                      <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} />
-                      <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--foreground)' }} />
-                      <Bar dataKey="total" fill="var(--chart-1)" radius={[4, 4, 0, 0]} name="Sales (₹)" />
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="total" fill="#3b82f6" radius={8} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -105,6 +178,7 @@ function ReportsPage() {
           </>
         )}
 
+        {/* Customer Report */}
         {reportType === 'customer' && (
           <Card className="glass-card border-border/50">
             <CardContent className="p-0">
@@ -114,20 +188,29 @@ function ReportsPage() {
                     <TableRow>
                       <TableHead>Customer</TableHead>
                       <TableHead>Phone</TableHead>
-                      <TableHead>Orders</TableHead>
+                      <TableHead>Total Orders</TableHead>
                       <TableHead>Total Amount</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {salesByCustomer.map(c => (
-                      <TableRow key={c.name}>
-                        <TableCell className="font-medium">{c.name}</TableCell>
-                        <TableCell>{customers.find(cu => cu.name === c.name)?.phone}</TableCell>
-                        <TableCell>{c.orders}</TableCell>
-                        <TableCell>₹{c.total.toLocaleString('en-IN')}</TableCell>
+                    {salesByCustomer.map(c => {
+                      const customer = customers.find(cu => cu.name === c.name);
+                      return (
+                        <TableRow key={c.name}>
+                          <TableCell className="font-medium">{c.name}</TableCell>
+                          <TableCell>{customer?.phone}</TableCell>
+                          <TableCell>{c.orders}</TableCell>
+                          <TableCell className="font-medium">₹{c.total.toLocaleString('en-IN')}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {salesByCustomer.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-12 text-muted-foreground">
+                          No sales data available
+                        </TableCell>
                       </TableRow>
-                    ))}
-                    {salesByCustomer.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No data</TableCell></TableRow>}
+                    )}
                   </TableBody>
                 </Table>
               </div>
@@ -135,25 +218,41 @@ function ReportsPage() {
           </Card>
         )}
 
+        {/* Product Report */}
         {reportType === 'product' && (
           <>
             <Card className="glass-card border-border/50">
-              <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Sales by Product Type</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle>Sales by Product Type</CardTitle>
+              </CardHeader>
               <CardContent>
-                <div className="h-64 flex items-center justify-center">
+                <div className="h-80 flex items-center justify-center">
                   {salesByProduct.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie data={salesByProduct} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={5} dataKey="amount" nameKey="name">
-                          {salesByProduct.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                        <Pie
+                          data={salesByProduct}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={100}
+                          dataKey="amount"
+                          nameKey="name"
+                        >
+                          {salesByProduct.map((_, index) => (
+                            <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                          ))}
                         </Pie>
-                        <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--foreground)' }} />
+                        <Tooltip />
                       </PieChart>
                     </ResponsiveContainer>
-                  ) : <p className="text-sm text-muted-foreground">No sales data</p>}
+                  ) : (
+                    <p className="text-muted-foreground">No product sales data</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
+
             <Card className="glass-card border-border/50">
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
@@ -162,7 +261,7 @@ function ReportsPage() {
                       <TableRow>
                         <TableHead>Product Type</TableHead>
                         <TableHead>Metal</TableHead>
-                        <TableHead>Qty Sold</TableHead>
+                        <TableHead>Quantity Sold</TableHead>
                         <TableHead>Total Amount</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -183,18 +282,21 @@ function ReportsPage() {
           </>
         )}
 
+        {/* Order Status Report */}
         {reportType === 'orders' && (
           <Card className="glass-card border-border/50">
-            <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Order Status Summary</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Order Status Summary</CardTitle>
+            </CardHeader>
             <CardContent>
-              <div className="h-64">
+              <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={statusSummary}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                    <XAxis dataKey="status" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} className="capitalize" />
-                    <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} />
-                    <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--foreground)' }} />
-                    <Bar dataKey="count" fill="var(--chart-3)" radius={[4, 4, 0, 0]} name="Orders" />
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="status" className="capitalize" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="#8b5cf6" radius={8} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -205,3 +307,5 @@ function ReportsPage() {
     </AppLayout>
   );
 }
+
+const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];

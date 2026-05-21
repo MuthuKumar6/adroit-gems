@@ -10,44 +10,97 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { restrictionStore, customerStore, productStore } from "@/lib/store";
-import type { Restriction } from "@/lib/types";
-import { useState } from "react";
-import { Plus, Trash2, Shield } from "lucide-react";
+import type { Restriction, Customer, Product } from "@/lib/types";
+import { useState, useEffect } from "react";
+import { Plus, Trash2, Shield, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/restrictions")({
   component: RestrictionsPage,
 });
 
 function RestrictionsPage() {
-  const [restrictions, setRestrictions] = useState<Restriction[]>(restrictionStore.getAll());
+  const [restrictions, setRestrictions] = useState<Restriction[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [form, setForm] = useState({ customerId: '', productId: '', dailyGramLimit: '50' });
+  const [form, setForm] = useState({
+    customer_id: '',
+    product_id: '',
+    daily_gram_limit: '50'
+  });
 
-  const customers = customerStore.getAll();
-  const products = productStore.getAll();
-  const refresh = () => setRestrictions(restrictionStore.getAll());
+  // Fetch Data
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [restrictionsData, customersData, productsData] = await Promise.all([
+        restrictionStore.getAll(),
+        customerStore.getAll(),
+        productStore.getAll()
+      ]);
 
-  const handleAdd = () => {
-    restrictionStore.add({
-      customerId: form.customerId,
-      productId: form.productId,
-      dailyGramLimit: Number(form.dailyGramLimit),
-      isActive: true,
-    });
-    refresh();
-    setDialogOpen(false);
-    setForm({ customerId: '', productId: '', dailyGramLimit: '50' });
+      setRestrictions(restrictionsData);
+      setCustomers(customersData);
+      setProducts(productsData);
+    } catch (err) {
+      console.error("Failed to fetch restrictions data:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const toggleActive = (id: string, isActive: boolean) => {
-    restrictionStore.update(id, { isActive });
-    refresh();
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleAdd = async () => {
+    if (!form.customer_id || !form.product_id) {
+      alert("Please select customer and product");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await restrictionStore.add({
+        customerId: form.customer_id,
+        productId: form.product_id,
+        dailyGramLimit: Number(form.daily_gram_limit),
+        isActive: true,
+      });
+
+      await fetchData();
+      setDialogOpen(false);
+      setForm({ customer_id: '', product_id: '', daily_gram_limit: '50' });
+    } catch (err) {
+      console.error(err);
+      alert("Failed to add restriction");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Delete restriction?')) {
-      restrictionStore.delete(id);
-      refresh();
+  const toggleActive = async (id: string, isActive: boolean) => {
+    try {
+      await restrictionStore.update(id, { isActive });
+      await fetchData();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to update restriction");
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this restriction?")) return;
+
+    try {
+      await restrictionStore.delete(id);
+      await fetchData();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete restriction");
     }
   };
 
@@ -59,7 +112,7 @@ function RestrictionsPage() {
             <h1 className="text-2xl lg:text-3xl font-heading font-bold gold-text">Restrictions</h1>
             <p className="text-muted-foreground text-sm mt-1">Set daily gram limits per customer per product</p>
           </div>
-          <Button onClick={() => setDialogOpen(true)}>
+          <Button onClick={() => setDialogOpen(true)} disabled={loading}>
             <Plus className="h-4 w-4 mr-2" /> Add Restriction
           </Button>
         </div>
@@ -93,65 +146,114 @@ function RestrictionsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {restrictions.map(r => {
-                    const customer = customerStore.getById(r.customerId);
-                    const product = productStore.getById(r.productId);
-                    return (
-                      <TableRow key={r.id}>
-                        <TableCell className="font-medium">{customer?.name || 'Unknown'}</TableCell>
-                        <TableCell>{product?.name || 'Unknown'} ({product?.purity})</TableCell>
-                        <TableCell className="font-mono">{r.dailyGramLimit}g</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Switch checked={r.isActive} onCheckedChange={(v) => toggleActive(r.id, v)} />
-                            <Badge variant={r.isActive ? 'default' : 'secondary'}>{r.isActive ? 'Active' : 'Inactive'}</Badge>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(r.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                  {restrictions.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No restrictions set</TableCell></TableRow>}
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-12">
+                        <Loader2 className="animate-spin mx-auto h-6 w-6" />
+                      </TableCell>
+                    </TableRow>
+                  ) : restrictions.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-12">
+                        No restrictions set yet
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    restrictions.map(r => {
+                      const customer = customers.find(c => c.id === r.customer_id);
+                      const product = products.find(p => p.id === r.product_id);
+
+                      return (
+                        <TableRow key={r.id}>
+                          <TableCell className="font-medium">{customer?.name || 'Unknown'}</TableCell>
+                          <TableCell>
+                            {product?.name} ({product?.purity})
+                          </TableCell>
+                          <TableCell className="font-mono font-medium">{r.daily_gram_limit}g</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={r.is_active}
+                                onCheckedChange={(v) => toggleActive(r.id, v)}
+                              />
+                              <Badge variant={r.is_active ? 'default' : 'secondary'}>
+                                {r.is_active ? 'Active' : 'Inactive'}
+                              </Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(r.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
                 </TableBody>
               </Table>
             </div>
           </CardContent>
         </Card>
 
+        {/* Add Restriction Dialog */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent>
-            <DialogHeader><DialogTitle>Add Restriction</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>Add New Restriction</DialogTitle>
+            </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label>Customer</Label>
-                <Select value={form.customerId} onValueChange={v => setForm(f => ({ ...f, customerId: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
+                <Label>Customer *</Label>
+                <Select value={form.customer_id} onValueChange={v => setForm(f => ({ ...f, customer_id: v }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select customer" />
+                  </SelectTrigger>
                   <SelectContent>
-                    {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    {customers.map(c => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name} ({c.phone})
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
+
               <div className="grid gap-2">
-                <Label>Product (Metal)</Label>
-                <Select value={form.productId} onValueChange={v => setForm(f => ({ ...f, productId: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
+                <Label>Product (Metal) *</Label>
+                <Select value={form.product_id} onValueChange={v => setForm(f => ({ ...f, product_id: v }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select product" />
+                  </SelectTrigger>
                   <SelectContent>
-                    {products.map(p => <SelectItem key={p.id} value={p.id}>{p.name} ({p.purity})</SelectItem>)}
+                    {products.map(p => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name} ({p.purity})
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
+
               <div className="grid gap-2">
-                <Label>Daily Gram Limit</Label>
-                <Input type="number" value={form.dailyGramLimit} onChange={e => setForm(f => ({ ...f, dailyGramLimit: e.target.value }))} />
+                <Label>Daily Gram Limit (grams) *</Label>
+                <Input
+                  type="number"
+                  value={form.daily_gram_limit}
+                  onChange={e => setForm(f => ({ ...f, daily_gram_limit: e.target.value }))}
+                />
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleAdd} disabled={!form.customerId || !form.productId}>Add</Button>
+              <Button onClick={handleAdd} disabled={saving || !form.customer_id || !form.product_id}>
+                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Add Restriction
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

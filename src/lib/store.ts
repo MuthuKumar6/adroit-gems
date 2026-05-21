@@ -1,308 +1,100 @@
+import { api } from '../lib/api';
 
-
-import type { Product, ProductType, Customer, Order, Bill, Restriction, StockAlert } from './types';
-import { auth } from './auth';
-
-// Multi-tenant: all keys are namespaced by current shopId.
-// If no shop is logged in, falls back to a "guest" namespace (so SSR/preview don't crash).
-function shopId(): string {
-  return auth.getCurrentShopId() || 'guest';
-}
-
-const KEYS = {
-  get products() { return `jewel_erp:${shopId()}:products`; },
-  get productTypes() { return `jewel_erp:${shopId()}:product_types`; },
-  get customers() { return `jewel_erp:${shopId()}:customers`; },
-  get orders() { return `jewel_erp:${shopId()}:orders`; },
-  get bills() { return `jewel_erp:${shopId()}:bills`; },
-  get restrictions() { return `jewel_erp:${shopId()}:restrictions`; },
-  get alerts() { return `jewel_erp:${shopId()}:alerts`; },
-  get initialized() { return `jewel_erp:${shopId()}:initialized`; },
-};
-
-function get<T>(key: string): T[] {
-  if (typeof window === 'undefined') return [];
-  const data = localStorage.getItem(key);
-  return data ? JSON.parse(data) : [];
-}
-
-function set<T>(key: string, data: T[]): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(key, JSON.stringify(data));
-}
-
-function genId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-}
-
-function genOrderNumber(): string {
-  const orders = get<Order>(KEYS.orders);
-  return `ORD-${String(orders.length + 1).padStart(4, '0')}`;
-}
-
-function genBillNumber(): string {
-  const bills = get<Bill>(KEYS.bills);
-  return `BILL-${String(bills.length + 1).padStart(4, '0')}`;
-}
-
-// Products
 export const productStore = {
-  getAll: () => get<Product>(KEYS.products),
-  getById: (id: string) => get<Product>(KEYS.products).find(p => p.id === id),
-  add: (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const items = get<Product>(KEYS.products);
-    const now = new Date().toISOString();
-    const newItem: Product = { ...product, id: genId(), createdAt: now, updatedAt: now };
-    items.push(newItem);
-    set(KEYS.products, items);
-    return newItem;
+  getAll: async () => {
+    const res = await api.products.getAll();
+    return res.ok ? res.data || [] : [];
   },
-  update: (id: string, data: Partial<Product>) => {
-    const items = get<Product>(KEYS.products);
-    const idx = items.findIndex(p => p.id === id);
-    if (idx !== -1) {
-      items[idx] = { ...items[idx], ...data, updatedAt: new Date().toISOString() };
-      set(KEYS.products, items);
-    }
-    return items[idx];
+  getById: (id: string) => api.request(`/products/${id}`),
+  // add: (data: any) => api.products.create(data),
+  add: async (data: any) => {
+    const res = await api.products.create(data);
+    const product = res.ok ? res.data : res;
+    return { ...product, currentRate: product.currentRate ?? product.current_rate };
   },
-  delete: (id: string) => {
-    const items = get<Product>(KEYS.products).filter(p => p.id !== id);
-    set(KEYS.products, items);
-  },
+  update: (id: string, data: any) => api.products.update(id, data),
+  delete: (id: string) => api.products.delete(id),
 };
 
-// Product Types
 export const productTypeStore = {
-  getAll: () => get<ProductType>(KEYS.productTypes),
-  getById: (id: string) => get<ProductType>(KEYS.productTypes).find(p => p.id === id),
-  add: (pt: Omit<ProductType, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const items = get<ProductType>(KEYS.productTypes);
-    const now = new Date().toISOString();
-    const newItem: ProductType = { ...pt, id: genId(), createdAt: now, updatedAt: now };
-    items.push(newItem);
-    set(KEYS.productTypes, items);
-    checkStockAlert(newItem);
-    return newItem;
+  getAll: async () => {
+    const res = await api.productTypes.getAll();
+    return res.ok ? res.data || [] : [];
   },
-  update: (id: string, data: Partial<ProductType>) => {
-    const items = get<ProductType>(KEYS.productTypes);
-    const idx = items.findIndex(p => p.id === id);
-    if (idx !== -1) {
-      items[idx] = { ...items[idx], ...data, updatedAt: new Date().toISOString() };
-      set(KEYS.productTypes, items);
-      checkStockAlert(items[idx]);
-    }
-    return items[idx];
-  },
-  delete: (id: string) => {
-    const items = get<ProductType>(KEYS.productTypes).filter(p => p.id !== id);
-    set(KEYS.productTypes, items);
-  },
-  updateStock: (id: string, change: number) => {
-    const items = get<ProductType>(KEYS.productTypes);
-    const idx = items.findIndex(p => p.id === id);
-    if (idx !== -1) {
-      items[idx].inStock += change;
-      items[idx].updatedAt = new Date().toISOString();
-      set(KEYS.productTypes, items);
-      checkStockAlert(items[idx]);
-    }
-    return items[idx];
-  },
+  getById: (id: string) => api.request(`/product-types/${id}`),
+  add: (data: any) => api.productTypes.create(data),
+  update: (id: string, data: any) => api.productTypes.update(id, data),
+  updateStock: (id: string, change: number) => api.productTypes.updateStock(id, change),
+  delete: (id: string) => api.productTypes.delete(id),
 };
 
-// Customers
 export const customerStore = {
-  getAll: () => get<Customer>(KEYS.customers),
-  getById: (id: string) => get<Customer>(KEYS.customers).find(c => c.id === id),
-  add: (c: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const items = get<Customer>(KEYS.customers);
-    const now = new Date().toISOString();
-    const newItem: Customer = { ...c, id: genId(), createdAt: now, updatedAt: now };
-    items.push(newItem);
-    set(KEYS.customers, items);
-    return newItem;
+  getAll: async () => {
+    const res = await api.customers.getAll();
+    return res.ok ? res.data || [] : [];
   },
-  update: (id: string, data: Partial<Customer>) => {
-    const items = get<Customer>(KEYS.customers);
-    const idx = items.findIndex(c => c.id === id);
-    if (idx !== -1) {
-      items[idx] = { ...items[idx], ...data, updatedAt: new Date().toISOString() };
-      set(KEYS.customers, items);
-    }
-    return items[idx];
-  },
-  delete: (id: string) => {
-    const items = get<Customer>(KEYS.customers).filter(c => c.id !== id);
-    set(KEYS.customers, items);
-  },
+  getById: (id: string) => api.request(`/customers/${id}`),
+  add: (data: any) => api.customers.create(data),
+  update: (id: string, data: any) => api.customers.update(id, data),
+  delete: (id: string) => api.customers.delete(id),
 };
 
-// Orders
 export const orderStore = {
-  getAll: () => get<Order>(KEYS.orders),
-  getById: (id: string) => get<Order>(KEYS.orders).find(o => o.id === id),
-  add: (o: Omit<Order, 'id' | 'orderNumber' | 'createdAt' | 'updatedAt'>) => {
-    const items = get<Order>(KEYS.orders);
-    const now = new Date().toISOString();
-    const newItem: Order = { ...o, id: genId(), orderNumber: genOrderNumber(), createdAt: now, updatedAt: now };
-    items.push(newItem);
-    set(KEYS.orders, items);
-    // Deduct from stock
-    for (const item of o.items) {
-      productTypeStore.updateStock(item.productTypeId, -item.quantity);
-    }
-    return newItem;
+  getAll: async () => {
+    const res = await api.orders.getAll();
+    return res.ok ? res.data || [] : [];
   },
-  update: (id: string, data: Partial<Order>) => {
-    const items = get<Order>(KEYS.orders);
-    const idx = items.findIndex(o => o.id === id);
-    if (idx !== -1) {
-      items[idx] = { ...items[idx], ...data, updatedAt: new Date().toISOString() };
-      set(KEYS.orders, items);
-    }
-    return items[idx];
-  },
-  updateStatus: (id: string, status: Order['status']) => {
-    const items = get<Order>(KEYS.orders);
-    const idx = items.findIndex(o => o.id === id);
-    if (idx !== -1) {
-      const oldStatus = items[idx].status;
-      items[idx].status = status;
-      items[idx].updatedAt = new Date().toISOString();
-      set(KEYS.orders, items);
-      // If cancelled, return stock
-      if (status === 'cancelled' && oldStatus !== 'cancelled') {
-        for (const item of items[idx].items) {
-          productTypeStore.updateStock(item.productTypeId, item.quantity);
-        }
-      }
-    }
-    return items[idx];
-  },
-  delete: (id: string) => {
-    const order = get<Order>(KEYS.orders).find(o => o.id === id);
-    if (order && order.status !== 'cancelled') {
-      for (const item of order.items) {
-        productTypeStore.updateStock(item.productTypeId, item.quantity);
-      }
-    }
-    const items = get<Order>(KEYS.orders).filter(o => o.id !== id);
-    set(KEYS.orders, items);
-  },
-  getByCustomer: (customerId: string) => get<Order>(KEYS.orders).filter(o => o.customerId === customerId),
+  getById: (id: string) => api.request(`/orders/${id}`),
+  add: (data: any) => api.orders.create(data),
+  updateStatus: (id: string, status: string) => api.orders.updateStatus(id, status),
+  delete: (id: string) => api.request(`/orders/${id}`, { method: 'DELETE' }),
 };
 
-// Bills
 export const billStore = {
-  getAll: () => get<Bill>(KEYS.bills),
-  getById: (id: string) => get<Bill>(KEYS.bills).find(b => b.id === id),
-  add: (b: Omit<Bill, 'id' | 'billNumber' | 'createdAt'>) => {
-    const items = get<Bill>(KEYS.bills);
-    const now = new Date().toISOString();
-    const newItem: Bill = { ...b, id: genId(), billNumber: genBillNumber(), createdAt: now };
-    items.push(newItem);
-    set(KEYS.bills, items);
-    return newItem;
+  getAll: async () => {
+    const res = await api.bills.getAll();
+    return res.ok ? res.data || [] : [];
   },
-  update: (id: string, data: Partial<Bill>) => {
-    const items = get<Bill>(KEYS.bills);
-    const idx = items.findIndex(b => b.id === id);
-    if (idx !== -1) {
-      items[idx] = { ...items[idx], ...data };
-      set(KEYS.bills, items);
-    }
-    return items[idx];
-  },
+  add: (data: any) => api.bills.create(data),
 };
 
-// Restrictions
-export const restrictionStore = {
-  getAll: () => get<Restriction>(KEYS.restrictions),
-  add: (r: Omit<Restriction, 'id' | 'createdAt'>) => {
-    const items = get<Restriction>(KEYS.restrictions);
-    const newItem: Restriction = { ...r, id: genId(), createdAt: new Date().toISOString() };
-    items.push(newItem);
-    set(KEYS.restrictions, items);
-    return newItem;
-  },
-  update: (id: string, data: Partial<Restriction>) => {
-    const items = get<Restriction>(KEYS.restrictions);
-    const idx = items.findIndex(r => r.id === id);
-    if (idx !== -1) {
-      items[idx] = { ...items[idx], ...data };
-      set(KEYS.restrictions, items);
-    }
-    return items[idx];
-  },
-  delete: (id: string) => {
-    set(KEYS.restrictions, get<Restriction>(KEYS.restrictions).filter(r => r.id !== id));
-  },
-  checkLimit: (customerId: string, productId: string, requestedGrams: number): { allowed: boolean; limit: number; usedToday: number } => {
-    const restrictions = get<Restriction>(KEYS.restrictions).filter(
-      r => r.customerId === customerId && r.productId === productId && r.isActive
-    );
-    if (restrictions.length === 0) return { allowed: true, limit: 0, usedToday: 0 };
-
-    const limit = Math.min(...restrictions.map(r => r.dailyGramLimit));
-    const today = new Date().toISOString().split('T')[0];
-    const todayOrders = get<Order>(KEYS.orders).filter(
-      o => o.customerId === customerId && o.createdAt.startsWith(today) && o.status !== 'cancelled'
-    );
-    const usedToday = todayOrders.reduce((sum, o) => sum + o.totalWeight, 0);
-    return { allowed: usedToday + requestedGrams <= limit, limit, usedToday };
-  },
-};
-
-// Alerts
 export const alertStore = {
-  getAll: () => get<StockAlert>(KEYS.alerts),
-  getUnread: () => get<StockAlert>(KEYS.alerts).filter(a => !a.isRead),
-  add: (a: Omit<StockAlert, 'id' | 'createdAt'>) => {
-    const items = get<StockAlert>(KEYS.alerts);
-    const newItem: StockAlert = { ...a, id: genId(), createdAt: new Date().toISOString() };
-    items.push(newItem);
-    set(KEYS.alerts, items);
-    return newItem;
+  getAll: () => api.request('/alerts'),
+  getUnread: async () => {
+    const res = await api.alerts.getUnread();
+    return res.ok ? res.data || [] : [];
   },
-  markRead: (id: string) => {
-    const items = get<StockAlert>(KEYS.alerts);
-    const idx = items.findIndex(a => a.id === id);
-    if (idx !== -1) {
-      items[idx].isRead = true;
-      set(KEYS.alerts, items);
-    }
-  },
-  markAllRead: () => {
-    const items = get<StockAlert>(KEYS.alerts).map(a => ({ ...a, isRead: true }));
-    set(KEYS.alerts, items);
-  },
+  markRead: (id: string) => api.alerts.markRead(id),
+  markAllRead: () => api.alerts.markAllRead(),
 };
 
-function checkStockAlert(pt: ProductType) {
-  if (pt.inStock <= 0) {
-    alertStore.add({
-      productTypeId: pt.id,
-      message: `${pt.name} is out of stock!`,
-      type: 'out_of_stock',
-      isRead: false,
+export const restrictionStore = {
+  getAll: async () => {
+    const res = await api.restrictions.getAll();
+    return res.ok ? res.data || [] : [];
+  },
+  add: async (data: any) => {
+    const res = await api.restrictions.add(data);
+    return res;
+  },
+  update: async (id: string, data: any) => {
+    const res = await api.request(`/restrictions/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
     });
-  } else if (pt.inStock <= 3) {
-    alertStore.add({
-      productTypeId: pt.id,
-      message: `${pt.name} is running low (${pt.inStock} left)`,
-      type: 'low_stock',
-      isRead: false,
-    });
-  }
-}
-
-// Empty initialization (no dummy data)
-export function initializeSeedData() {
-  if (typeof window === 'undefined') return;
-  if (localStorage.getItem(KEYS.initialized)) return;
-
-  // No seed data added - database starts empty
-  localStorage.setItem(KEYS.initialized, 'true');
-}
+    return res;
+  },
+  delete: async (id: string) => {
+    const res = await api.request(`/restrictions/${id}`, { method: 'DELETE' });
+    return res;
+  },
+  checkLimit: async (customerId: string, productId: string, requestedGrams: number) => {
+    try {
+      const res = await api.restrictions.checkLimit(customerId, productId, requestedGrams);
+      return res.ok ? res : { allowed: true, limit: 0, usedToday: 0 };
+    } catch (err) {
+      console.error(err);
+      return { allowed: true, limit: 0, usedToday: 0 };
+    }
+  },
+};
