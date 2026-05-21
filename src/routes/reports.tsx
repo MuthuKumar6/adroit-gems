@@ -64,7 +64,7 @@ function ReportsPage() {
   // Sales by Customer
   const salesByCustomer = customers
     .map(c => {
-      const customerBills = bills.filter(b => b.customer_id === c.id);
+      const customerBills = bills.filter((b: any) => (b.customer_id ?? b.customerId) === c.id);
       return {
         name: c.name,
         total: customerBills.reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0),
