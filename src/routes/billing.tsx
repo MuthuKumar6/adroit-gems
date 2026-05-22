@@ -479,19 +479,6 @@ function VyabariInvoice({
 
         return (
           <div key={pIdx} style={{ width: "210mm", minHeight: "297mm", padding: "12mm 15mm 10mm", boxSizing: "border-box", display: "flex", flexDirection: "column", pageBreakAfter: isLast ? "auto" : "always", breakAfter: isLast ? "auto" : "page" }}>
-            <VyabariShopHeader bill={bill} customer={customer} page={pageNum} totalPages={totalPages} />
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", flexGrow: isLast ? 0 : 1 }}>
-              <thead>
-                <tr>
-                  <th style={thStyle("center")}>S.No</th>
-                  <th style={thStyle("left")}>Description</th>
-                  <th style={thStyle("center")}>HUID</th>
-                  <th style={thStyle("center")}>Qty</th>
-                  <th style={thStyle("right")}>Weight (g)</th>
-                  <th style={thStyle("right")}>Amount (₹)</th>
-                </tr>
-              </thead>
-              <tbody>
             <VyabariShopHeader bill={bill} customer={customer} page={pageNum} totalPages={totalPages} goldRate={goldRate} silverRate={silverRate} />
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", flexGrow: isLast ? 0 : 1 }}>
               <thead>
