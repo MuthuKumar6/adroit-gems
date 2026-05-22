@@ -345,20 +345,21 @@ const VYB_ROWS_FIRST = 20;
 const VYB_ROWS_OTHER = 28;
 const VYB_ROWS_LAST_MIN = 6;
 
-function VyabariShopHeader({ bill, customer, page, totalPages }: {
-  bill: Bill; customer: Customer | undefined; page: number; totalPages: number;
+function VyabariShopHeader({ bill, customer, page, totalPages, goldRate, silverRate }: {
+  bill: Bill; customer: Customer | undefined; page: number; totalPages: number; goldRate: string; silverRate: string;
 }) {
+  const shop = getShopHeader();
   return (
     <>
       <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "1mm" }}>
         <tbody><tr>
-          <td style={{ fontSize: "11px" }}>GSTIN : <strong>33BNFPS1282R1ZE</strong></td>
-          <td style={{ textAlign: "right", fontSize: "11px" }}>Phone : <strong>94423 28128</strong></td>
+          <td style={{ fontSize: "11px" }}>GSTIN : <strong>{shop.gstin}</strong></td>
+          <td style={{ textAlign: "right", fontSize: "11px" }}>Phone : <strong>{shop.phone}</strong></td>
         </tr></tbody>
       </table>
       <div style={{ textAlign: "center", borderTop: "3px double #000", borderBottom: "3px double #000", padding: "3mm 0", marginBottom: "3mm" }}>
-        <div style={{ fontSize: "26px", fontWeight: "bold", letterSpacing: "4px" }}>SRIDHAR JEWELLERS</div>
-        <div style={{ fontSize: "12px", marginTop: "1mm" }}>215, Swamy Viveganandar Salai, Ramanadhapuram – 623501</div>
+        <div style={{ fontSize: "26px", fontWeight: "bold", letterSpacing: "4px", textTransform: "uppercase" }}>{shop.name}</div>
+        <div style={{ fontSize: "12px", marginTop: "1mm" }}>{shop.address}</div>
       </div>
       <div style={{ textAlign: "center", fontSize: "14px", fontWeight: "bold", letterSpacing: "3px", borderBottom: "1px solid #000", paddingBottom: "2mm", marginBottom: "3mm" }}>
         SALES BILL{totalPages > 1 ? `  (Page ${page} of ${totalPages})` : ""}
@@ -381,11 +382,11 @@ function VyabariShopHeader({ bill, customer, page, totalPages }: {
               <td style={{ padding: "4px 8px", textAlign: "right", borderBottom: "1px solid #ccc" }}>{(customer as any)?.city || "Ramanathapuram"}</td>
             </tr>
             <tr>
-              <td style={{ padding: "4px 8px", borderBottom: "1px solid #ccc" }}><strong>Gold Rate :</strong>&nbsp;—</td>
+              <td style={{ padding: "4px 8px", borderBottom: "1px solid #ccc" }}><strong>Gold Rate :</strong>&nbsp;{goldRate}</td>
               <td style={{ padding: "4px 8px", borderBottom: "1px solid #ccc" }}></td>
             </tr>
             <tr>
-              <td style={{ padding: "4px 8px" }}><strong>Silver Rate :</strong>&nbsp;—</td>
+              <td style={{ padding: "4px 8px" }}><strong>Silver Rate :</strong>&nbsp;{silverRate}</td>
               <td style={{ padding: "4px 8px", textAlign: "right" }}><strong>HSN NO :</strong>&nbsp;711319</td>
             </tr>
           </tbody>
