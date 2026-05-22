@@ -89,12 +89,15 @@ export const restrictionStore = {
     return res;
   },
   checkLimit: async (customerId: string, productId: string, requestedGrams: number) => {
+    // Fail-closed: any network/server error surfaces as a blocked check.
+    // Caller can decide to retry or alert the user, instead of silently allowing.
     try {
       const res = await api.restrictions.checkLimit(customerId, productId, requestedGrams);
-      return res.ok ? res : { allowed: true, limit: 0, usedToday: 0 };
+      if (res && typeof res.allowed === 'boolean') return res;
+      return { allowed: false, limit: 0, usedToday: 0, error: 'Invalid response from server' };
     } catch (err) {
-      console.error(err);
-      return { allowed: true, limit: 0, usedToday: 0 };
+      console.error('checkLimit failed:', err);
+      return { allowed: false, limit: 0, usedToday: 0, error: 'Could not verify daily limit' };
     }
   },
 };

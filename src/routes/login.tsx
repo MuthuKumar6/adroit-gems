@@ -91,7 +91,7 @@ function LoginPage() {
     try {
       const res = await api.auth.login({ email, password });
 
-      console.log("Login Response:", res);
+      
 
       if (res.ok) {
         // Save authentication data
