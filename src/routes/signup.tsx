@@ -37,7 +37,7 @@ function SignupPage() {
         password 
       });
 
-      console.log("✅ Signup Response:", res);
+      
 
       if (res.ok) {
         localStorage.setItem("token", res.token);
