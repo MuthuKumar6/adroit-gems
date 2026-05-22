@@ -115,10 +115,24 @@ function CusInvoice({
   productTypeMap: ProductTypeMap;
 }) {
   const customer = customerMap[bill.customerId];
+  const shop = getShopHeader();
   const sgst = +(bill.gstAmount / 2).toFixed(2);
   const cgst = +(bill.gstAmount / 2).toFixed(2);
   const roundOff = +(Math.round(bill.totalAmount) - bill.totalAmount).toFixed(2);
   const finalTotal = Math.round(bill.totalAmount);
+
+  // Derive gold/silver rate from this bill's items (rate_per_gram on the order item).
+  const rateFor = (metalKeyword: string) => {
+    const it = bill.items.find((i: any) => {
+      const pt = productTypeMap[i.productTypeId];
+      const metal = (pt as any)?.metal || (pt as any)?.product_name || pt?.name || '';
+      return String(metal).toLowerCase().includes(metalKeyword);
+    });
+    const rate = (it as any)?.ratePerGram ?? (it as any)?.rate_per_gram;
+    return rate ? `₹${Number(rate).toLocaleString('en-IN')}` : '—';
+  };
+  const goldRate = rateFor('gold');
+  const silverRate = rateFor('silver');
 
   const td = (extra?: React.CSSProperties): React.CSSProperties => ({
     padding: "8px 10px",
@@ -155,10 +169,10 @@ function CusInvoice({
         <tbody>
           <tr>
             <td style={{ fontSize: "12px", paddingBottom: "1mm" }}>
-              GSTIN : <strong>33BNFPS1282R1ZE</strong>
+              GSTIN : <strong>{shop.gstin}</strong>
             </td>
             <td style={{ textAlign: "right", fontSize: "12px", paddingBottom: "1mm" }}>
-              Phone : <strong>94423 28128</strong>
+              Phone : <strong>{shop.phone}</strong>
             </td>
           </tr>
         </tbody>
@@ -166,10 +180,10 @@ function CusInvoice({
 
       <div style={{ textAlign: "center", borderTop: "3px double #000", borderBottom: "3px double #000", padding: "4mm 0", marginBottom: "4mm" }}>
         <div style={{ fontSize: "28px", fontWeight: "bold", letterSpacing: "4px", textTransform: "uppercase" }}>
-          Sridhar Jewellers
+          {shop.name}
         </div>
         <div style={{ fontSize: "13px", marginTop: "2mm" }}>
-          215, Swamy Viveganandar Salai, Ramanadhapuram – 623503
+          {shop.address}
         </div>
       </div>
 
@@ -197,11 +211,11 @@ function CusInvoice({
             </td>
           </tr>
           <tr>
-            <td style={td({ borderBottom: "1px solid #ccc" })}><strong>Gold Rate :</strong>&nbsp;—</td>
+            <td style={td({ borderBottom: "1px solid #ccc" })}><strong>Gold Rate :</strong>&nbsp;{goldRate}</td>
             <td style={td({ borderBottom: "1px solid #ccc", textAlign: "right" })}>{(customer as any)?.city || "Ramanathapuram"}</td>
           </tr>
           <tr>
-            <td style={td({ borderBottom: "1px solid #ccc" })}><strong>Silver Rate :</strong>&nbsp;—</td>
+            <td style={td({ borderBottom: "1px solid #ccc" })}><strong>Silver Rate :</strong>&nbsp;{silverRate}</td>
             <td style={td({ borderBottom: "1px solid #ccc" })}></td>
           </tr>
           <tr>
@@ -237,7 +251,7 @@ function CusInvoice({
               <tr key={item.id} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa" }}>
                 <td style={{ padding: "9px 10px", textAlign: "center", border: "1px solid #ddd" }}>{idx + 1}</td>
                 <td style={{ padding: "9px 10px", border: "1px solid #ddd" }}>{pt?.name || item.productTypeId}</td>
-                <td style={{ padding: "9px 10px", textAlign: "center", border: "1px solid #ddd" }}>{parseHuids(pt?.huids).join(", ")}</td>
+                <td style={{ padding: "9px 10px", textAlign: "center", border: "1px solid #ddd" }}>{parseHuids((item as any).huids).join(", ") || parseHuids(pt?.huids).join(", ")}</td>
                 <td style={{ padding: "9px 10px", textAlign: "center", border: "1px solid #ddd" }}>{item.quantity}</td>
                 <td style={{ padding: "9px 10px", textAlign: "right", border: "1px solid #ddd" }}>{item.weightGrams}</td>
                 <td style={{ padding: "9px 10px", textAlign: "right", border: "1px solid #ddd" }}>{pt?.wastage_percentage}</td>
