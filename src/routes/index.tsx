@@ -10,7 +10,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import type { Product, ProductType, Customer, Order, Bill } from "@/lib/types";
-import { log } from 'console';
 
 export const Route = createFileRoute("/")({
   component: DashboardPage,
