@@ -21,6 +21,20 @@ import {
 import type { Bill, Order, Customer, ProductType } from "@/lib/types";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Receipt, Eye, Printer } from "lucide-react";
+import { auth } from "@/lib/auth";
+
+// Reads the active shop from localStorage and falls back to legacy hardcoded
+// values so existing tenants keep printing correctly until they fill in their
+// own shop profile (gstin / phone / address).
+function getShopHeader() {
+  const shop = auth.getCurrentShop() || {};
+  return {
+    name: shop.shopName || shop.name || "Sridhar Jewellers",
+    gstin: shop.gstin || "33BNFPS1282R1ZE",
+    phone: shop.phone || "94423 28128",
+    address: shop.address || "215, Swamy Viveganandar Salai, Ramanadhapuram – 623503",
+  };
+}
 
 export const Route = createFileRoute("/billing")({
   component: BillingPage,
