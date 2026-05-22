@@ -422,6 +422,18 @@ function VyabariInvoice({
   const roundOff = +(Math.round(bill.totalAmount) - bill.totalAmount).toFixed(2);
   const finalTotal = Math.round(bill.totalAmount);
 
+  const rateFor = (metalKeyword: string) => {
+    const it = bill.items.find((i: any) => {
+      const pt = productTypeMap[i.productTypeId];
+      const metal = (pt as any)?.metal || (pt as any)?.product_name || pt?.name || '';
+      return String(metal).toLowerCase().includes(metalKeyword);
+    });
+    const rate = (it as any)?.ratePerGram ?? (it as any)?.rate_per_gram;
+    return rate ? `₹${Number(rate).toLocaleString('en-IN')}` : '—';
+  };
+  const goldRate = rateFor('gold');
+  const silverRate = rateFor('silver');
+
   const allItems = bill.items;
   const chunks: typeof allItems[] = [];
   let idx = 0;
@@ -480,13 +492,26 @@ function VyabariInvoice({
                 </tr>
               </thead>
               <tbody>
+            <VyabariShopHeader bill={bill} customer={customer} page={pageNum} totalPages={totalPages} goldRate={goldRate} silverRate={silverRate} />
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", flexGrow: isLast ? 0 : 1 }}>
+              <thead>
+                <tr>
+                  <th style={thStyle("center")}>S.No</th>
+                  <th style={thStyle("left")}>Description</th>
+                  <th style={thStyle("center")}>HUID</th>
+                  <th style={thStyle("center")}>Qty</th>
+                  <th style={thStyle("right")}>Weight (g)</th>
+                  <th style={thStyle("right")}>Amount (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
                 {pageItems.map((item, i) => {
                   const pt = productTypeMap[item.productTypeId];
                   return (
                     <tr key={item.id} style={{ background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
                       <td style={{ padding: "7px 8px", textAlign: "center", border: "1px solid #ddd" }}>{startNo + i}</td>
                       <td style={{ padding: "7px 8px", border: "1px solid #ddd" }}>{pt?.name || item.productTypeId}</td>
-                      <td style={{ padding: "7px 8px", textAlign: "center", border: "1px solid #ddd" }}>{parseHuids(pt?.huids).join(", ")}</td>
+                      <td style={{ padding: "7px 8px", textAlign: "center", border: "1px solid #ddd" }}>{parseHuids((item as any).huids).join(", ") || parseHuids(pt?.huids).join(", ")}</td>
                       <td style={{ padding: "7px 8px", textAlign: "center", border: "1px solid #ddd" }}>{item.quantity}</td>
                       <td style={{ padding: "7px 8px", textAlign: "right", border: "1px solid #ddd" }}>{item.weightGrams}</td>
                       <td style={{ padding: "7px 8px", textAlign: "right", border: "1px solid #ddd", fontWeight: "500" }}>
