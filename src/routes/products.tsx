@@ -89,11 +89,9 @@ function ProductsPage() {
 
     try {
       if (editing) {
-        const res = await productStore.update(editing.id, payload);
-        console.log("UPDATE RESPONSE:", res); // 👈
+        await productStore.update(editing.id, payload);
       } else {
-        const res = await productStore.add(payload);
-        console.log("CREATE RESPONSE:", res); // 👈
+        await productStore.add(payload);
       }
 
       await fetchProducts();

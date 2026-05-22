@@ -53,7 +53,7 @@ function ReportsPage() {
     fetchData();
   }, []);
 
-  console.log("bills", bills); // 👈 --- IGNORE ---
+  
 
   // Sales Summary
   const totalSales = bills.reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0);

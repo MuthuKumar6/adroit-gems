@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { productStore, productTypeStore, customerStore, orderStore, billStore, alertStore } from "@/lib/store";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import { Package, Users, ShoppingCart, TrendingUp, AlertTriangle, Warehouse, Clock, CheckCircle, Eye } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import type { Product, ProductType, Customer, Order, Bill } from "@/lib/types";
+
+// Tolerant numeric reader — handles both snake_case (API) and camelCase shapes.
+const num = (v: any) => Number(v ?? 0) || 0;
+const billTotal = (b: any) => num(b?.total_amount ?? b?.totalAmount);
+const orderTotal = (o: any) => num(o?.total_amount ?? o?.totalAmount);
 
 export const Route = createFileRoute("/")({
   component: DashboardPage,
@@ -76,7 +81,8 @@ function DashboardPage() {
 
 
   // ── Derived values (all synchronous from state) ─────────
-  const totalRevenue = bills.reduce((s, b) => s + b.total_amount, 0);
+  // Derived values — tolerate snake_case and camelCase API shapes.
+  const totalRevenue = bills.reduce((s, b: any) => s + billTotal(b), 0);
   const totalStockWeight = productTypes.reduce((s, pt) => s + pt.in_stock * pt.net_weight, 0);
   const pendingOrdersCount = orders.filter((o) => o.status === 'pending').length;
   const lowStockCount = productTypes.filter((pt) => pt.in_stock <= 3).length;
@@ -231,7 +237,7 @@ function DashboardPage() {
                     return (
                       <p key={o.id} className="text-sm text-muted-foreground">
                         <span className="font-medium text-foreground">{customerMap[o.customer_id]?.name || 'Unknown'}</span>
-                        {' '}— Order {o.order_number} — ₹{o.total_amount.toLocaleString('en-IN')} — Due at{' '}
+                        {' '}— Order {o.order_number} — ₹{orderTotal(o).toLocaleString('en-IN')} — Due at{' '}
                         <span className="font-medium text-foreground">{due.toLocaleTimeString()}</span>
                         {' '}— <span className="text-warning font-mono">{fmtCountdown(remaining)} left</span>
                       </p>
@@ -253,7 +259,7 @@ function DashboardPage() {
                     return (
                       <p key={o.id} className="text-sm text-muted-foreground">
                         <span className="font-medium text-foreground">{customerMap[o.customer_id]?.name || 'Unknown'}</span>
-                        {' '}— Order {o.order_number} — ₹{o.total_amount.toLocaleString('en-IN')}
+                        {' '}— Order {o.order_number} — ₹{orderTotal(o).toLocaleString('en-IN')}
                         {' '}— <span className="text-destructive">Time limit is over ({fmtLate(lateMs)})</span>
                       </p>
                     );
@@ -457,12 +463,10 @@ function DashboardPage() {
                   const hasOrders = pt.ordered > 0;
                   const isExpanded = expandedPt === pt.id;
                   const orderedCustomers = getOrdersForProductType(pt.id);
-                  console.log("product type", pt.name, "ordered customers", orderedCustomers); // 👈 --- IGNORE ---
 
                   return (
-                    <>
+                    <Fragment key={pt.id}>
                       <TableRow
-                        key={pt.id}
                         className={hasOrders ? "cursor-pointer hover:bg-accent/50" : ""}
                         onClick={() => hasOrders && setExpandedPt(isExpanded ? null : pt.id)}
                       >
@@ -484,7 +488,7 @@ function DashboardPage() {
                       </TableRow>
 
                       {hasOrders && isExpanded && (
-                        <TableRow key={`${pt.id}-expanded`}>
+                        <TableRow>
                           <TableCell colSpan={7} className="p-0 bg-muted/30">
                             <Collapsible open={isExpanded}>
                               <CollapsibleContent className="p-4 border-t">
@@ -522,7 +526,7 @@ function DashboardPage() {
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
+                    </Fragment>
                   );
                 })}
               </TableBody>
@@ -544,7 +548,7 @@ function DashboardPage() {
                         <p className="text-sm text-muted-foreground">{customerMap[o.customer_id]?.name}</p>
                       </div>
                       <div className="text-right">
-                        <p>₹{o.total_amount.toLocaleString('en-IN')}</p>
+                        <p>₹{orderTotal(o).toLocaleString('en-IN')}</p>
                         <Badge variant={o.status === 'pending' ? "outline" : o.status === 'cancelled' ? "destructive" : "default"}>
                           {o.status}
                         </Badge>
