@@ -52,13 +52,7 @@ function OrdersPage() {
   const [notes, setNotes] = useState('');
   const [paymentDueDate, setPaymentDueDate] = useState('');
 
-  // Live timer
-  const [, setNowTick] = useState(0);
-
-  useEffect(() => {
-    const timer = setInterval(() => setNowTick(n => n + 1), 1000);
-    return () => clearInterval(timer);
-  }, []);
+  // (Removed pointless 1s ticker — countdowns live only on the dashboard.)
 
   const fetchData = async () => {
     try {
@@ -180,14 +174,22 @@ function OrdersPage() {
     }
   };
 
+  // Transitions that wipe data / reverse stock — require confirmation.
+  const isDestructiveTransition = (from: Order['status'], to: Order['status']) => {
+    if (from === to) return false;
+    if (to === 'cancelled' && (from === 'approved' || from === 'dispatched' || from === 'delivered')) return true;
+    if (to === 'returned' && from === 'delivered') return true;
+    return false;
+  };
+
   const handleStatusChange = async (orderId: string, status: Order['status']) => {
     try {
-      // await orderStore.updateStatus(orderId, status);
-      // await fetchData();
-
-      console.log('Updating:', orderId, '→', status);  // ← add this
-      const result = await orderStore.updateStatus(orderId, status);
-      console.log('Result:', result);  // ← and this
+      const current = orders.find(o => o.id === orderId);
+      if (current && isDestructiveTransition(current.status, status)) {
+        const msg = `Change status from "${current.status}" to "${status}"?\n\nThis will reverse stock and cannot be undone.`;
+        if (!window.confirm(msg)) return;
+      }
+      await orderStore.updateStatus(orderId, status);
       await fetchData();
     } catch (err) {
       console.error(err);
@@ -214,7 +216,7 @@ function OrdersPage() {
         </div>
 
         <div className="flex gap-2 flex-wrap">
-          {['all', 'pending', 'approved', 'dispatched', 'delivered', 'cancelled'].map(s => (
+          {['all', 'pending', 'approved', 'dispatched', 'delivered', 'cancelled', 'returned'].map(s => (
             <Button key={s} variant={statusFilter === s ? 'default' : 'outline'} size="sm" onClick={() => setStatusFilter(s)} className="capitalize">
               {s}
             </Button>
