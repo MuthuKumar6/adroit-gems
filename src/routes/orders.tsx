@@ -298,6 +298,8 @@ function OrdersPage() {
                   ) : (
                     filteredOrders.map(o => {
                       const customer = customers.find(c => c.id === o.customer_id);
+                      const locked = isOrderLocked(o.id, billedOrderIds);
+                      const nextOptions = allowedNextStatuses(o.status);
                       return (
                         <TableRow key={o.id}>
                           <TableCell className="font-mono text-sm">{o.order_number}</TableCell>
@@ -306,14 +308,23 @@ function OrdersPage() {
                           <TableCell>{o.total_weight || '0.0'}g</TableCell>
                           <TableCell>₹{o.total_amount?.toLocaleString('en-IN') ?? '0.00'}</TableCell>
                           <TableCell>
-                            <Select value={o.status} onValueChange={(v) => handleStatusChange(o.id, v as Order['status'])}>
-                              <SelectTrigger className="w-28 h-7 text-xs"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {['pending', 'approved', 'dispatched', 'delivered', 'cancelled', 'returned'].map(s => (
-                                  <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <div className="flex items-center gap-1">
+                              <Select value={o.status} onValueChange={(v) => handleStatusChange(o.id, v as OrderStatus)}>
+                                <SelectTrigger className="w-28 h-7 text-xs"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {nextOptions.map(s => {
+                                    const isDestructive = isDestructiveTransition(o.status, s);
+                                    const disabled = locked && isDestructive;
+                                    return (
+                                      <SelectItem key={s} value={s} disabled={disabled} className="capitalize">
+                                        {s}{disabled ? ' (locked)' : ''}
+                                      </SelectItem>
+                                    );
+                                  })}
+                                </SelectContent>
+                              </Select>
+                              {locked && <Lock className="h-3 w-3 text-muted-foreground" aria-label="Order has a bill — locked from destructive changes" />}
+                            </div>
                           </TableCell>
                           <TableCell className="text-xs">
                             {o.payment_due_date ? new Date(o.payment_due_date).toLocaleDateString() : '—'}
