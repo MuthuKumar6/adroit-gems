@@ -197,23 +197,44 @@ function OrdersPage() {
     }
   };
 
-  // Transitions that wipe data / reverse stock — require confirmation.
-  const isDestructiveTransition = (from: Order['status'], to: Order['status']) => {
-    if (from === to) return false;
-    if (to === 'cancelled' && (from === 'approved' || from === 'dispatched' || from === 'delivered')) return true;
-    if (to === 'returned' && from === 'delivered') return true;
-    return false;
+  // Add stock back for each item — used when cancelling/returning an order.
+  const reverseStockForOrder = async (order: Order) => {
+    for (const item of order.items || []) {
+      const ptId = (item as any).product_type_id || (item as any).productTypeId;
+      const qty = Number((item as any).quantity || 0);
+      if (!ptId || qty <= 0) continue;
+      try {
+        await productTypeStore.updateStock(ptId, qty);
+      } catch (e) {
+        console.warn('Failed to reverse stock for', ptId, e);
+      }
+    }
   };
 
-  const handleStatusChange = async (orderId: string, status: Order['status']) => {
+  const applyStatusChange = async (current: Order, status: OrderStatus): Promise<boolean> => {
+    const err = validateTransition(current, status, billedOrderIds);
+    if (err) { alert(err); return false; }
+
+    if (isDestructiveTransition(current.status, status)) {
+      const reversal = shouldReverseStock(current.status, status) ? '\n\nStock for this order will be returned to inventory.' : '';
+      if (!window.confirm(`Change status from "${current.status}" to "${status}"?${reversal}\n\nThis cannot be undone.`)) {
+        return false;
+      }
+    }
+
+    await orderStore.updateStatus(current.id, status);
+    if (shouldReverseStock(current.status, status)) {
+      await reverseStockForOrder(current);
+    }
+    return true;
+  };
+
+  const handleStatusChange = async (orderId: string, status: OrderStatus) => {
     try {
       const current = orders.find(o => o.id === orderId);
-      if (current && isDestructiveTransition(current.status, status)) {
-        const msg = `Change status from "${current.status}" to "${status}"?\n\nThis will reverse stock and cannot be undone.`;
-        if (!window.confirm(msg)) return;
-      }
-      await orderStore.updateStatus(orderId, status);
-      await fetchData();
+      if (!current) return;
+      const ok = await applyStatusChange(current, status);
+      if (ok) await fetchData();
     } catch (err) {
       console.error(err);
     }
