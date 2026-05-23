@@ -116,6 +116,16 @@ function OrdersPage() {
     setLimitWarning('');
 
     try {
+      // Refresh products to get the latest current_rate at submit time —
+      // protects against stale rate captured when the form opened.
+      let freshProducts = products;
+      try {
+        freshProducts = await productStore.getAll();
+        setProducts(freshProducts);
+      } catch (e) {
+        console.warn('Failed to refresh product rates, using cached values', e);
+      }
+
       let totalWeight = 0;
       const finalItems: OrderItem[] = [];
 
@@ -123,7 +133,7 @@ function OrdersPage() {
         const pt = productTypes.find(p => p.id === oi.productTypeId);
         if (!pt) continue;
 
-        const product = products.find(p => p.id === pt.product_id);
+        const product = freshProducts.find((p: Product) => p.id === pt.product_id);
         const weight = (pt.net_weight || 0) * oi.quantity;
         const rate = product?.current_rate || 0;
         const making = pt.making_charge_type === 'per_gram'
