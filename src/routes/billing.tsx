@@ -664,6 +664,7 @@ function BillingPage() {
     const disc = Number(discount);
     const total = Number(selectedOrder.total_amount) - disc;
     const paid = Number(paidAmount) || total;
+    const fullyPaid = paid >= total;
 
     await billStore.add({
       orderId: selectedOrder.id,
@@ -677,8 +678,19 @@ function BillingPage() {
       paidAmount: paid,
       balanceAmount: total - paid,
       paymentMethod,
-      status: paid >= total ? "paid" : paid > 0 ? "partial" : "unpaid",
+      status: fullyPaid ? "paid" : paid > 0 ? "partial" : "unpaid",
     });
+
+    // Sync payment_received on the parent order so the dashboard / orders
+    // page reflects payment state. Backend may ignore unknown fields — that's
+    // a soft failure, the bill itself is still the source of truth.
+    if (fullyPaid) {
+      try {
+        await orderStore.update(selectedOrder.id, { payment_received: true, paymentReceived: true });
+      } catch (e) {
+        console.warn('Could not sync payment_received on order', e);
+      }
+    }
 
     await loadAll();
     setDialogOpen(false);
