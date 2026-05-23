@@ -46,6 +46,7 @@ export const orderStore = {
   },
   getById: (id: string) => api.request(`/orders/${id}`),
   add: (data: any) => api.orders.create(data),
+  update: (id: string, data: any) => api.orders.update(id, data),
   updateStatus: (id: string, status: string) => api.orders.updateStatus(id, status),
   delete: (id: string) => api.request(`/orders/${id}`, { method: 'DELETE' }),
 };

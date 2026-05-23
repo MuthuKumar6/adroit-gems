@@ -9,10 +9,18 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { orderStore, customerStore, productTypeStore, productStore, restrictionStore } from "@/lib/store";
-import type { Order, OrderItem, Customer, ProductType, Product } from "@/lib/types";
+import { orderStore, customerStore, productTypeStore, productStore, restrictionStore, billStore } from "@/lib/store";
+import type { Order, OrderItem, Customer, ProductType, Product, OrderStatus } from "@/lib/types";
 import { useState, useEffect } from "react";
-import { Plus, Eye, Pencil, AlertTriangle, Loader2 } from "lucide-react";
+import { Plus, Eye, Pencil, AlertTriangle, Loader2, Lock } from "lucide-react";
+import {
+  ORDER_STATUSES,
+  allowedNextStatuses,
+  isDestructiveTransition,
+  shouldReverseStock,
+  isOrderLocked,
+  validateTransition,
+} from "@/lib/orderFlow";
 
 export const Route = createFileRoute("/orders")({
   component: OrdersPage,
@@ -32,6 +40,7 @@ function OrdersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [productTypes, setProductTypes] = useState<ProductType[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [billedOrderIds, setBilledOrderIds] = useState<Set<string>>(new Set());
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -57,17 +66,21 @@ function OrdersPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [ordersData, customersData, productTypesData, productsData] = await Promise.all([
+      const [ordersData, customersData, productTypesData, productsData, billsData] = await Promise.all([
         orderStore.getAll(),
         customerStore.getAll(),
         productTypeStore.getAll(),
-        productStore.getAll()
+        productStore.getAll(),
+        billStore.getAll(),
       ]);
 
       setOrders(ordersData);
       setCustomers(customersData);
       setProductTypes(productTypesData);
       setProducts(productsData);
+      setBilledOrderIds(new Set(
+        (Array.isArray(billsData) ? billsData : []).map((b: any) => b.order_id ?? b.orderId).filter(Boolean)
+      ));
     } catch (err) {
       console.error("Failed to fetch data:", err);
     } finally {
@@ -103,6 +116,16 @@ function OrdersPage() {
     setLimitWarning('');
 
     try {
+      // Refresh products to get the latest current_rate at submit time —
+      // protects against stale rate captured when the form opened.
+      let freshProducts = products;
+      try {
+        freshProducts = await productStore.getAll();
+        setProducts(freshProducts);
+      } catch (e) {
+        console.warn('Failed to refresh product rates, using cached values', e);
+      }
+
       let totalWeight = 0;
       const finalItems: OrderItem[] = [];
 
@@ -110,7 +133,7 @@ function OrdersPage() {
         const pt = productTypes.find(p => p.id === oi.productTypeId);
         if (!pt) continue;
 
-        const product = products.find(p => p.id === pt.product_id);
+        const product = freshProducts.find((p: Product) => p.id === pt.product_id);
         const weight = (pt.net_weight || 0) * oi.quantity;
         const rate = product?.current_rate || 0;
         const making = pt.making_charge_type === 'per_gram'
@@ -174,23 +197,44 @@ function OrdersPage() {
     }
   };
 
-  // Transitions that wipe data / reverse stock — require confirmation.
-  const isDestructiveTransition = (from: Order['status'], to: Order['status']) => {
-    if (from === to) return false;
-    if (to === 'cancelled' && (from === 'approved' || from === 'dispatched' || from === 'delivered')) return true;
-    if (to === 'returned' && from === 'delivered') return true;
-    return false;
+  // Add stock back for each item — used when cancelling/returning an order.
+  const reverseStockForOrder = async (order: Order) => {
+    for (const item of order.items || []) {
+      const ptId = (item as any).product_type_id || (item as any).productTypeId;
+      const qty = Number((item as any).quantity || 0);
+      if (!ptId || qty <= 0) continue;
+      try {
+        await productTypeStore.updateStock(ptId, qty);
+      } catch (e) {
+        console.warn('Failed to reverse stock for', ptId, e);
+      }
+    }
   };
 
-  const handleStatusChange = async (orderId: string, status: Order['status']) => {
+  const applyStatusChange = async (current: Order, status: OrderStatus): Promise<boolean> => {
+    const err = validateTransition(current, status, billedOrderIds);
+    if (err) { alert(err); return false; }
+
+    if (isDestructiveTransition(current.status, status)) {
+      const reversal = shouldReverseStock(current.status, status) ? '\n\nStock for this order will be returned to inventory.' : '';
+      if (!window.confirm(`Change status from "${current.status}" to "${status}"?${reversal}\n\nThis cannot be undone.`)) {
+        return false;
+      }
+    }
+
+    await orderStore.updateStatus(current.id, status);
+    if (shouldReverseStock(current.status, status)) {
+      await reverseStockForOrder(current);
+    }
+    return true;
+  };
+
+  const handleStatusChange = async (orderId: string, status: OrderStatus) => {
     try {
       const current = orders.find(o => o.id === orderId);
-      if (current && isDestructiveTransition(current.status, status)) {
-        const msg = `Change status from "${current.status}" to "${status}"?\n\nThis will reverse stock and cannot be undone.`;
-        if (!window.confirm(msg)) return;
-      }
-      await orderStore.updateStatus(orderId, status);
-      await fetchData();
+      if (!current) return;
+      const ok = await applyStatusChange(current, status);
+      if (ok) await fetchData();
     } catch (err) {
       console.error(err);
     }
@@ -254,6 +298,8 @@ function OrdersPage() {
                   ) : (
                     filteredOrders.map(o => {
                       const customer = customers.find(c => c.id === o.customer_id);
+                      const locked = isOrderLocked(o.id, billedOrderIds);
+                      const nextOptions = allowedNextStatuses(o.status);
                       return (
                         <TableRow key={o.id}>
                           <TableCell className="font-mono text-sm">{o.order_number}</TableCell>
@@ -262,14 +308,23 @@ function OrdersPage() {
                           <TableCell>{o.total_weight || '0.0'}g</TableCell>
                           <TableCell>₹{o.total_amount?.toLocaleString('en-IN') ?? '0.00'}</TableCell>
                           <TableCell>
-                            <Select value={o.status} onValueChange={(v) => handleStatusChange(o.id, v as Order['status'])}>
-                              <SelectTrigger className="w-28 h-7 text-xs"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {['pending', 'approved', 'dispatched', 'delivered', 'cancelled', 'returned'].map(s => (
-                                  <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <div className="flex items-center gap-1">
+                              <Select value={o.status} onValueChange={(v) => handleStatusChange(o.id, v as OrderStatus)}>
+                                <SelectTrigger className="w-28 h-7 text-xs"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {nextOptions.map(s => {
+                                    const isDestructive = isDestructiveTransition(o.status, s);
+                                    const disabled = locked && isDestructive;
+                                    return (
+                                      <SelectItem key={s} value={s} disabled={disabled} className="capitalize">
+                                        {s}{disabled ? ' (locked)' : ''}
+                                      </SelectItem>
+                                    );
+                                  })}
+                                </SelectContent>
+                              </Select>
+                              {locked && <Lock className="h-3 w-3 text-muted-foreground" aria-label="Order has a bill — locked from destructive changes" />}
+                            </div>
                           </TableCell>
                           <TableCell className="text-xs">
                             {o.payment_due_date ? new Date(o.payment_due_date).toLocaleDateString() : '—'}
@@ -475,14 +530,26 @@ function OrdersPage() {
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
                 <Label>Status</Label>
-                <Select value={editStatus} onValueChange={(v) => setEditStatus(v as Order['status'])}>
+                <Select value={editStatus} onValueChange={(v) => setEditStatus(v as OrderStatus)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {['pending', 'approved', 'dispatched', 'delivered', 'cancelled', 'returned'].map(s => (
-                      <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
-                    ))}
+                    {(editOrder ? allowedNextStatuses(editOrder.status) : ORDER_STATUSES).map(s => {
+                      const locked = editOrder ? isOrderLocked(editOrder.id, billedOrderIds) : false;
+                      const isDestructive = editOrder ? isDestructiveTransition(editOrder.status, s) : false;
+                      const disabled = locked && isDestructive;
+                      return (
+                        <SelectItem key={s} value={s} disabled={disabled} className="capitalize">
+                          {s}{disabled ? ' (locked — bill exists)' : ''}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
+                {editOrder && isOrderLocked(editOrder.id, billedOrderIds) && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Lock className="h-3 w-3" /> A bill exists for this order — cancel/return is disabled.
+                  </p>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label>Notes</Label>
@@ -500,7 +567,10 @@ function OrdersPage() {
                 if (!editOrder) return;
                 setSaving(true);
                 try {
-                  await orderStore.updateStatus(editOrder.id, editStatus);
+                  if (editStatus !== editOrder.status) {
+                    const ok = await applyStatusChange(editOrder, editStatus);
+                    if (!ok) { setSaving(false); return; }
+                  }
                   await fetchData();
                   setEditOrder(null);
                 } catch (err) {
