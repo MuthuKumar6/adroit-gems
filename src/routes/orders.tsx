@@ -66,17 +66,21 @@ function OrdersPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [ordersData, customersData, productTypesData, productsData] = await Promise.all([
+      const [ordersData, customersData, productTypesData, productsData, billsData] = await Promise.all([
         orderStore.getAll(),
         customerStore.getAll(),
         productTypeStore.getAll(),
-        productStore.getAll()
+        productStore.getAll(),
+        billStore.getAll(),
       ]);
 
       setOrders(ordersData);
       setCustomers(customersData);
       setProductTypes(productTypesData);
       setProducts(productsData);
+      setBilledOrderIds(new Set(
+        (Array.isArray(billsData) ? billsData : []).map((b: any) => b.order_id ?? b.orderId).filter(Boolean)
+      ));
     } catch (err) {
       console.error("Failed to fetch data:", err);
     } finally {
