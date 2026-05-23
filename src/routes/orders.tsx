@@ -530,14 +530,26 @@ function OrdersPage() {
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
                 <Label>Status</Label>
-                <Select value={editStatus} onValueChange={(v) => setEditStatus(v as Order['status'])}>
+                <Select value={editStatus} onValueChange={(v) => setEditStatus(v as OrderStatus)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {['pending', 'approved', 'dispatched', 'delivered', 'cancelled', 'returned'].map(s => (
-                      <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
-                    ))}
+                    {(editOrder ? allowedNextStatuses(editOrder.status) : ORDER_STATUSES).map(s => {
+                      const locked = editOrder ? isOrderLocked(editOrder.id, billedOrderIds) : false;
+                      const isDestructive = editOrder ? isDestructiveTransition(editOrder.status, s) : false;
+                      const disabled = locked && isDestructive;
+                      return (
+                        <SelectItem key={s} value={s} disabled={disabled} className="capitalize">
+                          {s}{disabled ? ' (locked — bill exists)' : ''}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
+                {editOrder && isOrderLocked(editOrder.id, billedOrderIds) && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Lock className="h-3 w-3" /> A bill exists for this order — cancel/return is disabled.
+                  </p>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label>Notes</Label>
@@ -555,7 +567,10 @@ function OrdersPage() {
                 if (!editOrder) return;
                 setSaving(true);
                 try {
-                  await orderStore.updateStatus(editOrder.id, editStatus);
+                  if (editStatus !== editOrder.status) {
+                    const ok = await applyStatusChange(editOrder, editStatus);
+                    if (!ok) { setSaving(false); return; }
+                  }
                   await fetchData();
                   setEditOrder(null);
                 } catch (err) {
