@@ -9,10 +9,18 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { orderStore, customerStore, productTypeStore, productStore, restrictionStore } from "@/lib/store";
-import type { Order, OrderItem, Customer, ProductType, Product } from "@/lib/types";
+import { orderStore, customerStore, productTypeStore, productStore, restrictionStore, billStore } from "@/lib/store";
+import type { Order, OrderItem, Customer, ProductType, Product, OrderStatus } from "@/lib/types";
 import { useState, useEffect } from "react";
-import { Plus, Eye, Pencil, AlertTriangle, Loader2 } from "lucide-react";
+import { Plus, Eye, Pencil, AlertTriangle, Loader2, Lock } from "lucide-react";
+import {
+  ORDER_STATUSES,
+  allowedNextStatuses,
+  isDestructiveTransition,
+  shouldReverseStock,
+  isOrderLocked,
+  validateTransition,
+} from "@/lib/orderFlow";
 
 export const Route = createFileRoute("/orders")({
   component: OrdersPage,
