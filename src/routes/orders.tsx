@@ -40,6 +40,7 @@ function OrdersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [productTypes, setProductTypes] = useState<ProductType[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [billedOrderIds, setBilledOrderIds] = useState<Set<string>>(new Set());
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
