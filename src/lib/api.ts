@@ -77,6 +77,7 @@ export const api = {
   orders: {
     getAll: () => wrappedFetch(`${API_BASE}/orders`, { headers: defaultHeaders() }),
     create: (data: any) => wrappedFetch(`${API_BASE}/orders`, { method: 'POST', headers: defaultHeaders(), body: JSON.stringify(data) }),
+    update: (id: string, data: any) => wrappedFetch(`${API_BASE}/orders/${id}`, { method: 'PUT', headers: defaultHeaders(), body: JSON.stringify(data) }),
     updateStatus: (id: string, status: string) =>
       wrappedFetch(`${API_BASE}/orders/${id}/status`, { method: 'PATCH', headers: defaultHeaders(), body: JSON.stringify({ status }) }),
     delete: (id: string) => wrappedFetch(`${API_BASE}/orders/${id}`, { method: 'DELETE', headers: defaultHeaders() }),
