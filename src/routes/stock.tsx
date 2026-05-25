@@ -3,9 +3,8 @@ import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { productStore, productTypeStore } from "@/lib/store";
+import { useProducts, useProductTypes } from "@/lib/queries";
 import type { ProductType, Product } from "@/lib/types";
-import { useState, useEffect } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
 
@@ -14,30 +13,11 @@ export const Route = createFileRoute("/stock")({
 });
 
 function StockPage() {
-  const [productTypes, setProductTypes] = useState<ProductType[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Fetch data
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [ptData, pData] = await Promise.all([
-        productTypeStore.getAll(),
-        productStore.getAll()
-      ]);
-      setProductTypes(ptData);
-      setProducts(pData);
-    } catch (err) {
-      console.error("Failed to load stock data:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const productTypesQ = useProductTypes();
+  const productsQ = useProducts();
+  const productTypes: ProductType[] = productTypesQ.data ?? [];
+  const products: Product[] = productsQ.data ?? [];
+  const loading = productTypesQ.isLoading || productsQ.isLoading;
 
   const totalStock = productTypes.reduce((sum, pt) => sum + (pt.in_stock || 0), 0);
   const totalWeight = productTypes.reduce((sum, pt) => sum + (pt.in_stock || 0) * (pt.net_weight || 0), 0);

@@ -1,14 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { orderStore, customerStore, productTypeStore, productStore, billStore } from "@/lib/store";
+import { useOrders, useBills, useCustomers, useProductTypes, useProducts } from "@/lib/queries";
 import type { Order, Bill, Customer, ProductType, Product } from "@/lib/types";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { FileText, Download, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/reports")({
   component: ReportsPage,
@@ -17,41 +16,20 @@ export const Route = createFileRoute("/reports")({
 function ReportsPage() {
   const [reportType, setReportType] = useState<'sales' | 'customer' | 'product' | 'orders'>('sales');
 
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [bills, setBills] = useState<Bill[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [productTypes, setProductTypes] = useState<ProductType[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
+  const ordersQ = useOrders();
+  const billsQ = useBills();
+  const customersQ = useCustomers();
+  const productTypesQ = useProductTypes();
+  const productsQ = useProducts();
 
-  const [loading, setLoading] = useState(true);
+  const orders: Order[] = ordersQ.data ?? [];
+  const bills: Bill[] = billsQ.data ?? [];
+  const customers: Customer[] = customersQ.data ?? [];
+  const productTypes: ProductType[] = productTypesQ.data ?? [];
+  const products: Product[] = productsQ.data ?? [];
 
-  // Fetch all data
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [ordersData, billsData, customersData, productTypesData, productsData] = await Promise.all([
-        orderStore.getAll(),
-        billStore.getAll(),
-        customerStore.getAll(),
-        productTypeStore.getAll(),
-        productStore.getAll(),
-      ]);
-
-      setOrders(ordersData);
-      setBills(billsData);
-      setCustomers(customersData);
-      setProductTypes(productTypesData);
-      setProducts(productsData);
-    } catch (err) {
-      console.error("Failed to load reports data:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const loading =
+    ordersQ.isLoading || billsQ.isLoading || customersQ.isLoading || productTypesQ.isLoading || productsQ.isLoading;
 
   
 

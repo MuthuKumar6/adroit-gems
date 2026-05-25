@@ -20,6 +20,8 @@ import {
 } from "@/lib/store";
 import type { Bill, Order, Customer, ProductType } from "@/lib/types";
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { qk } from "@/lib/queries";
 import { Receipt, Eye, Printer } from "lucide-react";
 import { auth } from "@/lib/auth";
 
@@ -597,6 +599,7 @@ function VyabariInvoice({
 
 /* ─── Main page ────────────────────────────────────────── */
 function BillingPage() {
+  const qc = useQueryClient();
   const [bills, setBills] = useState<Bill[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [customerMap, setCustomerMap] = useState<CustomerMap>({});
@@ -692,7 +695,7 @@ function BillingPage() {
       }
     }
 
-    await loadAll();
+    await loadAll(); qc.invalidateQueries({ queryKey: qk.bills }); qc.invalidateQueries({ queryKey: qk.orders });
     setDialogOpen(false);
     setSelectedOrderId("");
     setDiscount("0");
