@@ -108,38 +108,97 @@ function OrdersPage() {
 
   const handleCreate = async () => {
     if (!customerId || orderItems.length === 0) {
-      alert("Please select customer and add items");
+      alert("Please select customer and add at least one item");
       return;
+    }
+
+    // Customer must belong to this shop's loaded list
+    if (!customers.find(c => c.id === customerId)) {
+      alert("Selected customer is not valid for this shop");
+      return;
+    }
+
+    // Per-item structural validation
+    for (const oi of orderItems) {
+      if (!oi.productTypeId) {
+        alert("Every item must have a product selected");
+        return;
+      }
+      if (!productTypes.find(p => p.id === oi.productTypeId)) {
+        alert("One of the selected products is not valid for this shop");
+        return;
+      }
+      const qty = Number(oi.quantity);
+      if (!Number.isFinite(qty) || qty <= 0 || !Number.isInteger(qty)) {
+        alert(`Quantity must be a positive whole number (got "${oi.quantity}")`);
+        return;
+      }
+    }
+
+    // Warn (don't block) if payment due date is in the past
+    if (paymentDueDate) {
+      const due = new Date(paymentDueDate);
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      if (due < today) {
+        if (!confirm("Payment due date is in the past — the order will appear overdue immediately. Continue?")) {
+          return;
+        }
+      }
     }
 
     setSaving(true);
     setLimitWarning('');
 
     try {
-      // Refresh products to get the latest current_rate at submit time —
-      // protects against stale rate captured when the form opened.
+      // Refresh products + types at submit time — protects against stale rate
+      // and stale stock captured when the form was opened.
       let freshProducts = products;
+      let freshTypes = productTypes;
       try {
         freshProducts = await productStore.getAll();
         setProducts(freshProducts);
       } catch (e) {
         console.warn('Failed to refresh product rates, using cached values', e);
       }
+      try {
+        freshTypes = await productTypeStore.getAll();
+        setProductTypes(freshTypes);
+      } catch (e) {
+        console.warn('Failed to refresh product types, using cached values', e);
+      }
 
       let totalWeight = 0;
       const finalItems: OrderItem[] = [];
 
       for (const oi of orderItems) {
-        const pt = productTypes.find(p => p.id === oi.productTypeId);
-        if (!pt) continue;
+        const pt = freshTypes.find(p => p.id === oi.productTypeId);
+        if (!pt) {
+          setLimitWarning(`A selected product is no longer available`);
+          return;
+        }
 
         const product = freshProducts.find((p: Product) => p.id === pt.product_id);
         const weight = (pt.net_weight || 0) * oi.quantity;
-        const rate = product?.current_rate || 0;
+        const rate = Number(product?.current_rate || 0);
+
+        if (rate <= 0) {
+          setLimitWarning(`Rate for ${pt.name} is not set — update the product rate before ordering`);
+          return;
+        }
+        if (weight <= 0) {
+          setLimitWarning(`Weight for ${pt.name} is zero — check the product's net weight`);
+          return;
+        }
+
         const making = pt.making_charge_type === 'per_gram'
           ? (pt.making_charges || 0) * weight
           : (pt.making_charges || 0) * oi.quantity;
         const amount = (weight * rate) + making;
+
+        if (amount <= 0) {
+          setLimitWarning(`Item amount is zero for ${pt.name}`);
+          return;
+        }
 
         totalWeight += weight;
 
@@ -150,7 +209,7 @@ function OrdersPage() {
         }
 
         if (pt.in_stock < oi.quantity) {
-          setLimitWarning(`Not enough stock for ${pt.name}`);
+          setLimitWarning(`Not enough stock for ${pt.name} (have ${pt.in_stock}, need ${oi.quantity})`);
           return;
         }
 
@@ -165,6 +224,11 @@ function OrdersPage() {
           amount,
           product_type_id: oi.productTypeId,
         });
+      }
+
+      if (finalItems.length === 0) {
+        setLimitWarning('No valid items to order');
+        return;
       }
 
       const subtotal = finalItems.reduce((sum, i) => sum + i.amount, 0);
