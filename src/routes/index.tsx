@@ -1,8 +1,15 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { productStore, productTypeStore, customerStore, orderStore, billStore, alertStore } from "@/lib/store";
-import { useState, useEffect, useCallback, Fragment } from "react";
+import {
+  useProducts,
+  useProductTypes,
+  useCustomers,
+  useOrders,
+  useBills,
+  useUnreadAlerts,
+} from "@/lib/queries";
+import { useState, useEffect, useMemo, Fragment } from "react";
 import { Package, Users, ShoppingCart, TrendingUp, AlertTriangle, Warehouse, Clock, CheckCircle, Eye } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Badge } from "@/components/ui/badge";
@@ -20,64 +27,49 @@ export const Route = createFileRoute("/")({
   component: DashboardPage,
 });
 
-// ── Lookup map types ────────────────────────────────────
 type CustomerMap = Record<string, Customer>;
 type ProductMap = Record<string, Product>;
 
 function DashboardPage() {
-  // ── All async data ──────────────────────────────────────
-  const [productTypes, setProductTypes] = useState<ProductType[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [bills, setBills] = useState<Bill[]>([]);
-  const [alerts, setAlerts] = useState<any[]>([]);
-  const [customerMap, setCustomerMap] = useState<CustomerMap>({});
-  const [productMap, setProductMap] = useState<ProductMap>({});
-  const [loading, setLoading] = useState(true);
+  const productTypesQ = useProductTypes();
+  const ordersQ = useOrders();
+  const customersQ = useCustomers();
+  const billsQ = useBills();
+  const alertsQ = useUnreadAlerts();
+  const productsQ = useProducts();
 
-  // ── Countdown ticker (1s) ───────────────────────────────
+  const productTypes: ProductType[] = productTypesQ.data ?? [];
+  const orders: Order[] = ordersQ.data ?? [];
+  const customers: Customer[] = customersQ.data ?? [];
+  const bills: Bill[] = billsQ.data ?? [];
+  const alerts: any[] = alertsQ.data ?? [];
+  const products: Product[] = productsQ.data ?? [];
+
+  const loading =
+    productTypesQ.isLoading ||
+    ordersQ.isLoading ||
+    customersQ.isLoading ||
+    billsQ.isLoading ||
+    productsQ.isLoading;
+
+  const customerMap = useMemo<CustomerMap>(() => {
+    const m: CustomerMap = {};
+    customers.forEach((c) => { m[c.id] = c; });
+    return m;
+  }, [customers]);
+
+  const productMap = useMemo<ProductMap>(() => {
+    const m: ProductMap = {};
+    products.forEach((p) => { p && (m[p.id] = p); });
+    return m;
+  }, [products]);
+
+  // Countdown ticker (1s)
   const [, setNowTick] = useState(0);
-
-  const loadAll = useCallback(async () => {
-    const [ptRes, ordersRes, customersRes, billsRes, alertsRes, productsRes] =
-      await Promise.all([
-        productTypeStore.getAll(),
-        orderStore.getAll(),
-        customerStore.getAll(),
-        billStore.getAll(),
-        alertStore.getUnread(),
-        productStore.getAll(),
-      ]);
-
-    const pts: ProductType[] = Array.isArray(ptRes) ? ptRes : [];
-    const ords: Order[] = Array.isArray(ordersRes) ? ordersRes : [];
-    const custs: Customer[] = Array.isArray(customersRes) ? customersRes : [];
-    const bls: Bill[] = Array.isArray(billsRes) ? billsRes : [];
-    const alts: any[] = Array.isArray(alertsRes) ? alertsRes : [];
-    const prods: Product[] = Array.isArray(productsRes) ? productsRes : [];
-
-    setProductTypes(pts);
-    setOrders(ords);
-    setCustomers(custs);
-    setBills(bls);
-    setAlerts(alts);
-
-    const cMap: CustomerMap = {};
-    custs.forEach((c) => { cMap[c.id] = c; });
-    setCustomerMap(cMap);
-
-    const pMap: ProductMap = {};
-    prods.forEach((p) => { pMap[p.id] = p; });
-    setProductMap(pMap);
-
-    setLoading(false);
-  }, []);
-
   useEffect(() => {
-    loadAll();
     const ticker = setInterval(() => setNowTick((n) => n + 1), 1000);
     return () => clearInterval(ticker);
-  }, [loadAll]);
+  }, []);
 
 
   // ── Derived values (all synchronous from state) ─────────
