@@ -695,7 +695,7 @@ function BillingPage() {
       }
     }
 
-    await loadAll();
+    await loadAll(); qc.invalidateQueries({ queryKey: qk.bills }); qc.invalidateQueries({ queryKey: qk.orders });
     setDialogOpen(false);
     setSelectedOrderId("");
     setDiscount("0");

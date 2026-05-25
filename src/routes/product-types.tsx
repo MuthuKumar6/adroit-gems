@@ -498,6 +498,8 @@
 
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { qk } from "@/lib/queries";
 import { productStore, productTypeStore } from "@/lib/store";
 import type { ProductType, Product } from "@/lib/types";
 import { AppLayout } from "@/components/AppLayout";
