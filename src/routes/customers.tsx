@@ -1,6 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect, useCallback } from "react";
-import { customerStore, orderStore } from "@/lib/store";
+import { useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { toast } from "sonner";
+import { customerStore } from "@/lib/store";
+import { useCustomers, useOrders, useEntityMutation, qk } from "@/lib/queries";
+import { customerSchema, type CustomerFormValues } from "@/lib/schemas";
 import type { Customer, Order } from "@/lib/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,134 +20,97 @@ export const Route = createFileRoute("/customers")({
   component: CustomersPage,
 });
 
-const emptyForm = {
+const defaultValues: CustomerFormValues = {
   name: "",
   phone: "",
   email: "",
   address: "",
   gstin: "",
-  dailyGramLimit: "100",
+  dailyGramLimit: 100,
 };
 
 function CustomersPage() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const customersQ = useCustomers();
+  const ordersQ = useOrders();
 
-  // ── Per-customer order count map (customerId → count) ──
-  const [orderCountMap, setOrderCountMap] = useState<Record<string, number>>({});
+  const customers = customersQ.data ?? [];
+  const orders = ordersQ.data ?? [];
+  const loading = customersQ.isLoading;
 
-  // ── Orders shown in the detail dialog ──
-  const [detailOrders, setDetailOrders] = useState<Order[]>([]);
-  const [detailOrdersLoading, setDetailOrdersLoading] = useState(false);
+  // Per-customer order count
+  const orderCountMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    orders.forEach((o: Order) => {
+      map[o.customer_id] = (map[o.customer_id] ?? 0) + 1;
+    });
+    return map;
+  }, [orders]);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
-  const [form, setForm] = useState(emptyForm);
-
   const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null);
 
-  // ── Fetch customers + build order-count map in parallel ──
-  const fetchCustomers = useCallback(async () => {
-    try {
-      setLoading(true);
-      const [customersData, allOrders] = await Promise.all([
-        customerStore.getAll(),
-        orderStore.getAll(),
-      ]);
+  const detailOrders = useMemo(
+    () => (detailCustomer ? orders.filter((o: Order) => o.customer_id === detailCustomer.id) : []),
+    [detailCustomer, orders],
+  );
 
-      const customers: Customer[] = Array.isArray(customersData) ? customersData : [];
-      const orders: Order[] = Array.isArray(allOrders) ? allOrders : [];
+  const form = useForm<CustomerFormValues>({
+    resolver: zodResolver(customerSchema),
+    defaultValues,
+    mode: "onBlur",
+  });
 
-      setCustomers(customers);
+  const saveMut = useEntityMutation(
+    async (values: CustomerFormValues) => {
+      const payload = { ...values };
+      if (editing) return customerStore.update(editing.id, payload);
+      return customerStore.add(payload);
+    },
+    {
+      successMsg: "Customer saved",
+      errorMsg: "Failed to save customer",
+      invalidate: [qk.customers],
+    },
+  );
 
-      // Build count map from all orders client-side
-      const countMap: Record<string, number> = {};
-      orders.forEach((o) => {
-        countMap[o.customer_id] = (countMap[o.customer_id] ?? 0) + 1;
-      });
-      setOrderCountMap(countMap);
-    } catch (err) {
-      console.error("Failed to fetch customers:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchCustomers();
-  }, [fetchCustomers]);
-
-  // ── Load orders for the detail dialog when a customer is selected ──
-  useEffect(() => {
-    if (!detailCustomer) {
-      setDetailOrders([]);
-      return;
-    }
-    setDetailOrdersLoading(true);
-    orderStore
-      .getAll()
-      .then((all: Order[]) => {
-        const orders = Array.isArray(all) ? all : [];
-        setDetailOrders(orders.filter((o) => o.customer_id === detailCustomer.id));
-      })
-      .catch(console.error)
-      .finally(() => setDetailOrdersLoading(false));
-  }, [detailCustomer]);
+  const deleteMut = useEntityMutation((id: string) => customerStore.delete(id), {
+    successMsg: "Customer deleted",
+    errorMsg: "Failed to delete customer",
+    invalidate: [qk.customers],
+  });
 
   const openAdd = () => {
     setEditing(null);
-    setForm({ ...emptyForm });
+    form.reset(defaultValues);
     setDialogOpen(true);
   };
 
   const openEdit = (c: Customer) => {
     setEditing(c);
-    setForm({
+    form.reset({
       name: c.name,
       phone: c.phone,
       email: c.email || "",
       address: c.address || "",
       gstin: c.gstin || "",
-      dailyGramLimit: String(c.daily_gram_limit || 100),
+      dailyGramLimit: c.daily_gram_limit || 100,
     });
     setDialogOpen(true);
   };
 
-  const handleSave = async () => {
-    if (!form.name.trim() || !form.phone.trim()) {
-      alert("Name and Phone are required fields");
-      return;
-    }
-    setSaving(true);
-    const payload = { ...form, dailyGramLimit: Number(form.dailyGramLimit) || 0 };
-    try {
-      if (editing) {
-        await customerStore.update(editing.id, payload);
-      } else {
-        await customerStore.add(payload);
-      }
-      await fetchCustomers();
-      setDialogOpen(false);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to save customer. Please try again.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (!confirm("Are you sure you want to delete this customer?")) return;
-    try {
-      await customerStore.delete(id);
-      await fetchCustomers();
-    } catch (err) {
-      console.error(err);
-      alert("Failed to delete customer");
-    }
+    deleteMut.mutate(id);
   };
 
+  const onSubmit = form.handleSubmit(async (values) => {
+    await saveMut.mutateAsync(values).catch(() => {});
+    if (!saveMut.isError) setDialogOpen(false);
+  });
+
+  const errors = form.formState.errors;
+  const saving = saveMut.isPending;
 
   return (
     <AppLayout>
@@ -185,13 +153,12 @@ function CustomersPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    customers.map((c) => (
+                    customers.map((c: Customer) => (
                       <TableRow key={c.id}>
                         <TableCell className="font-medium">{c.name}</TableCell>
                         <TableCell>{c.phone}</TableCell>
                         <TableCell className="text-xs font-mono">{c.gstin || "-"}</TableCell>
                         <TableCell>{c.daily_gram_limit}g</TableCell>
-                        {/* ✅ Per-customer count from the map */}
                         <TableCell>{orderCountMap[c.id] ?? 0}</TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button variant="ghost" size="icon" onClick={() => setDetailCustomer(c)}>
@@ -200,7 +167,7 @@ function CustomersPage() {
                           <Button variant="ghost" size="icon" onClick={() => openEdit(c)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(c.id)}>
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(c.id)} disabled={deleteMut.isPending}>
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         </TableCell>
@@ -216,50 +183,53 @@ function CustomersPage() {
         {/* Add / Edit Dialog */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editing ? "Edit Customer" : "Add New Customer"}</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label>Name *</Label>
-                <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={onSubmit}>
+              <DialogHeader>
+                <DialogTitle>{editing ? "Edit Customer" : "Add New Customer"}</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label>Phone *</Label>
-                  <Input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+                  <Label>Name *</Label>
+                  <Input {...form.register("name")} />
+                  {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Phone *</Label>
+                    <Input {...form.register("phone")} />
+                    {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Email</Label>
+                    <Input type="email" {...form.register("email")} />
+                    {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+                  </div>
                 </div>
                 <div className="grid gap-2">
-                  <Label>Email</Label>
-                  <Input value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+                  <Label>Address</Label>
+                  <Input {...form.register("address")} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>GSTIN</Label>
+                    <Input {...form.register("gstin")} />
+                    {errors.gstin && <p className="text-xs text-destructive">{errors.gstin.message}</p>}
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Daily Gram Limit (grams)</Label>
+                    <Input type="number" {...form.register("dailyGramLimit")} />
+                    {errors.dailyGramLimit && <p className="text-xs text-destructive">{errors.dailyGramLimit.message}</p>}
+                  </div>
                 </div>
               </div>
-              <div className="grid gap-2">
-                <Label>Address</Label>
-                <Input value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label>GSTIN</Label>
-                  <Input value={form.gstin} onChange={(e) => setForm((f) => ({ ...f, gstin: e.target.value }))} />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Daily Gram Limit (grams)</Label>
-                  <Input
-                    type="number"
-                    value={form.dailyGramLimit}
-                    onChange={(e) => setForm((f) => ({ ...f, dailyGramLimit: e.target.value }))}
-                  />
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleSave} disabled={saving}>
-                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {editing ? "Update Customer" : "Create Customer"}
-              </Button>
-            </DialogFooter>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                <Button type="submit" disabled={saving}>
+                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {editing ? "Update Customer" : "Create Customer"}
+                </Button>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
 
@@ -278,17 +248,11 @@ function CustomersPage() {
               </div>
 
               <div className="border-t border-border pt-4">
-                <p className="text-sm font-medium mb-3">
-                  Recent Orders ({detailOrdersLoading ? "…" : detailOrders.length})
-                </p>
-                {detailOrdersLoading ? (
-                  <div className="flex justify-center py-4">
-                    <Loader2 className="animate-spin h-5 w-5 text-muted-foreground" />
-                  </div>
-                ) : detailOrders.length === 0 ? (
+                <p className="text-sm font-medium mb-3">Recent Orders ({detailOrders.length})</p>
+                {detailOrders.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No orders yet</p>
                 ) : (
-                  detailOrders.map((o) => (
+                  detailOrders.map((o: Order) => (
                     <div key={o.id} className="flex justify-between items-center p-3 rounded-lg bg-accent/50 mb-2">
                       <div>
                         <p className="font-medium">{o.order_number}</p>
@@ -297,7 +261,7 @@ function CustomersPage() {
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-medium">₹{o.total_amount?.toLocaleString("en-IN")}</p>
+                        <p className="font-medium">₹{Number(o.total_amount ?? 0).toLocaleString("en-IN")}</p>
                         <p className="text-xs capitalize">{o.status}</p>
                       </div>
                     </div>
