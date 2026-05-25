@@ -565,6 +565,10 @@ const toArray = (val: any): string[] => {
 };
 
 function ProductTypesPage() {
+  const qc = useQueryClient();
+  const invalidatePT = () => {
+    qc.invalidateQueries({ queryKey: qk.productTypes });
+  };
   const [items, setItems] = useState<ProductType[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
