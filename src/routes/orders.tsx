@@ -39,6 +39,12 @@ const statusColors: Record<string, string> = {
 };
 
 function OrdersPage() {
+  const qc = useQueryClient();
+  const invalidateAll = () => {
+    qc.invalidateQueries({ queryKey: qk.orders });
+    qc.invalidateQueries({ queryKey: qk.productTypes });
+    qc.invalidateQueries({ queryKey: qk.bills });
+  };
   const [orders, setOrders] = useState<Order[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [productTypes, setProductTypes] = useState<ProductType[]>([]);
