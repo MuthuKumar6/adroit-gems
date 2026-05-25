@@ -35,7 +35,7 @@ export const productSchema = z.object({
   purity: reqStr("Purity", 1, 50),
   currentRate: z.coerce.number().positive("Rate must be greater than 0"),
   gstPercentage: z.coerce.number().min(0, "GST cannot be negative").max(100, "GST cannot exceed 100%"),
-  unit: reqStr("Unit", 1, 20).default("gram"),
+  unit: reqStr("Unit", 1, 20),
 });
 export type ProductFormValues = z.infer<typeof productSchema>;
 
@@ -62,7 +62,7 @@ export type OrderFormValues = z.infer<typeof orderSchema>;
 
 export const billSchema = z.object({
   orderId: reqStr("Order"),
-  discount: z.coerce.number().min(0, "Discount cannot be negative").default(0),
+  discount: z.coerce.number().min(0, "Discount cannot be negative"),
   paidAmount: z.coerce.number().min(0, "Paid amount cannot be negative"),
   paymentMethod: z.enum(["cash", "bank_transfer", "cheque", "upi"]),
 });
