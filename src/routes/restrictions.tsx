@@ -9,9 +9,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { restrictionStore, customerStore, productStore } from "@/lib/store";
+import { restrictionStore } from "@/lib/store";
+import { useRestrictions, useCustomers, useProducts, useEntityMutation, qk } from "@/lib/queries";
+import { restrictionSchema, firstError } from "@/lib/schemas";
 import type { Restriction, Customer, Product } from "@/lib/types";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { toast } from "sonner";
 import { Plus, Trash2, Shield, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/restrictions")({
@@ -19,89 +22,56 @@ export const Route = createFileRoute("/restrictions")({
 });
 
 function RestrictionsPage() {
-  const [restrictions, setRestrictions] = useState<Restriction[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const restrictionsQ = useRestrictions();
+  const customersQ = useCustomers();
+  const productsQ = useProducts();
+
+  const restrictions: Restriction[] = restrictionsQ.data ?? [];
+  const customers: Customer[] = customersQ.data ?? [];
+  const products: Product[] = productsQ.data ?? [];
+  const loading = restrictionsQ.isLoading || customersQ.isLoading || productsQ.isLoading;
 
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [form, setForm] = useState({
-    customer_id: '',
-    product_id: '',
-    daily_gram_limit: '50'
+  const [form, setForm] = useState({ customer_id: "", product_id: "", daily_gram_limit: "50" });
+
+  const addMut = useEntityMutation(
+    async (payload: { customerId: string; productId: string; dailyGramLimit: number; isActive: boolean }) =>
+      restrictionStore.add(payload),
+    { successMsg: "Restriction added", errorMsg: "Failed to add restriction", invalidate: [qk.restrictions] },
+  );
+  const toggleMut = useEntityMutation(
+    ({ id, isActive }: { id: string; isActive: boolean }) => restrictionStore.update(id, { isActive }),
+    { errorMsg: "Failed to update restriction", invalidate: [qk.restrictions] },
+  );
+  const deleteMut = useEntityMutation((id: string) => restrictionStore.delete(id), {
+    successMsg: "Restriction deleted",
+    errorMsg: "Failed to delete restriction",
+    invalidate: [qk.restrictions],
   });
 
-  // Fetch Data
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [restrictionsData, customersData, productsData] = await Promise.all([
-        restrictionStore.getAll(),
-        customerStore.getAll(),
-        productStore.getAll()
-      ]);
-
-      setRestrictions(restrictionsData);
-      setCustomers(customersData);
-      setProducts(productsData);
-    } catch (err) {
-      console.error("Failed to fetch restrictions data:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const handleAdd = async () => {
-    if (!form.customer_id || !form.product_id) {
-      alert("Please select customer and product");
+    const parsed = restrictionSchema.safeParse(form);
+    if (!parsed.success) {
+      toast.error(firstError(parsed.error));
       return;
     }
-
-    setSaving(true);
-    try {
-      await restrictionStore.add({
-        customerId: form.customer_id,
-        productId: form.product_id,
-        dailyGramLimit: Number(form.daily_gram_limit),
+    await addMut
+      .mutateAsync({
+        customerId: parsed.data.customer_id,
+        productId: parsed.data.product_id,
+        dailyGramLimit: parsed.data.daily_gram_limit,
         isActive: true,
-      });
-
-      await fetchData();
+      })
+      .catch(() => {});
+    if (!addMut.isError) {
       setDialogOpen(false);
-      setForm({ customer_id: '', product_id: '', daily_gram_limit: '50' });
-    } catch (err) {
-      console.error(err);
-      alert("Failed to add restriction");
-    } finally {
-      setSaving(false);
+      setForm({ customer_id: "", product_id: "", daily_gram_limit: "50" });
     }
   };
 
-  const toggleActive = async (id: string, isActive: boolean) => {
-    try {
-      await restrictionStore.update(id, { isActive });
-      await fetchData();
-    } catch (err) {
-      console.error(err);
-      alert("Failed to update restriction");
-    }
-  };
-
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (!confirm("Are you sure you want to delete this restriction?")) return;
-
-    try {
-      await restrictionStore.delete(id);
-      await fetchData();
-    } catch (err) {
-      console.error(err);
-      alert("Failed to delete restriction");
-    }
+    deleteMut.mutate(id);
   };
 
   return (
@@ -159,34 +129,27 @@ function RestrictionsPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    restrictions.map(r => {
-                      const customer = customers.find(c => c.id === r.customer_id);
-                      const product = products.find(p => p.id === r.product_id);
-
+                    restrictions.map((r) => {
+                      const customer = customers.find((c) => c.id === r.customer_id);
+                      const product = products.find((p) => p.id === r.product_id);
                       return (
                         <TableRow key={r.id}>
-                          <TableCell className="font-medium">{customer?.name || 'Unknown'}</TableCell>
-                          <TableCell>
-                            {product?.name} ({product?.purity})
-                          </TableCell>
+                          <TableCell className="font-medium">{customer?.name || "Unknown"}</TableCell>
+                          <TableCell>{product?.name} ({product?.purity})</TableCell>
                           <TableCell className="font-mono font-medium">{r.daily_gram_limit}g</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <Switch
                                 checked={r.is_active}
-                                onCheckedChange={(v) => toggleActive(r.id, v)}
+                                onCheckedChange={(v) => toggleMut.mutate({ id: r.id, isActive: v })}
                               />
-                              <Badge variant={r.is_active ? 'default' : 'secondary'}>
-                                {r.is_active ? 'Active' : 'Inactive'}
+                              <Badge variant={r.is_active ? "default" : "secondary"}>
+                                {r.is_active ? "Active" : "Inactive"}
                               </Badge>
                             </div>
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDelete(r.id)}
-                            >
+                            <Button variant="ghost" size="icon" onClick={() => handleDelete(r.id)} disabled={deleteMut.isPending}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </TableCell>
@@ -200,7 +163,6 @@ function RestrictionsPage() {
           </CardContent>
         </Card>
 
-        {/* Add Restriction Dialog */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent>
             <DialogHeader>
@@ -209,49 +171,39 @@ function RestrictionsPage() {
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
                 <Label>Customer *</Label>
-                <Select value={form.customer_id} onValueChange={v => setForm(f => ({ ...f, customer_id: v }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select customer" />
-                  </SelectTrigger>
+                <Select value={form.customer_id} onValueChange={(v) => setForm((f) => ({ ...f, customer_id: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
                   <SelectContent>
-                    {customers.map(c => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name} ({c.phone})
-                      </SelectItem>
+                    {customers.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name} ({c.phone})</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="grid gap-2">
                 <Label>Product (Metal) *</Label>
-                <Select value={form.product_id} onValueChange={v => setForm(f => ({ ...f, product_id: v }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select product" />
-                  </SelectTrigger>
+                <Select value={form.product_id} onValueChange={(v) => setForm((f) => ({ ...f, product_id: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
                   <SelectContent>
-                    {products.map(p => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name} ({p.purity})
-                      </SelectItem>
+                    {products.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.name} ({p.purity})</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="grid gap-2">
                 <Label>Daily Gram Limit (grams) *</Label>
                 <Input
                   type="number"
                   value={form.daily_gram_limit}
-                  onChange={e => setForm(f => ({ ...f, daily_gram_limit: e.target.value }))}
+                  onChange={(e) => setForm((f) => ({ ...f, daily_gram_limit: e.target.value }))}
                 />
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleAdd} disabled={saving || !form.customer_id || !form.product_id}>
-                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Button onClick={handleAdd} disabled={addMut.isPending || !form.customer_id || !form.product_id}>
+                {addMut.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Add Restriction
               </Button>
             </DialogFooter>
