@@ -40,11 +40,13 @@ export function isDestructiveTransition(from: OrderStatus, to: OrderStatus): boo
   return false;
 }
 
-// Stock should be added back when an order is cancelled (from any stocked state)
-// or returned (from delivered). Mirrors backend cancellation logic.
+// Stock reversal the FRONTEND must perform. The backend already reverses
+// stock on cancellation, so we must NOT do it again here (that caused
+// double-reversal: 10 → order 1 → 9 → cancel → backend +1 = 10 → frontend +1 = 11).
+// Only `delivered → returned` is not handled by the backend today, so the
+// frontend fills that gap.
 export function shouldReverseStock(from: OrderStatus, to: OrderStatus): boolean {
   if (from === to) return false;
-  if (to === 'cancelled' && (from === 'pending' || from === 'approved' || from === 'dispatched')) return true;
   if (to === 'returned' && from === 'delivered') return true;
   return false;
 }
