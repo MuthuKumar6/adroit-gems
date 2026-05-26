@@ -24,6 +24,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queries";
 import { Receipt, Eye, Printer } from "lucide-react";
 import { auth } from "@/lib/auth";
+import { api } from "@/lib/api";
 
 // Reads the active shop from localStorage and falls back to legacy hardcoded
 // values so existing tenants keep printing correctly until they fill in their
@@ -37,6 +38,8 @@ function getShopHeader() {
     address: shop.address || "215, Swamy Viveganandar Salai, Ramanadhapuram – 623503",
   };
 }
+
+
 
 export const Route = createFileRoute("/billing")({
   component: BillingPage,
@@ -111,10 +114,20 @@ function CusInvoice({
   bill,
   customerMap,
   productTypeMap,
+  shopProfile
 }: {
   bill: Bill;
   customerMap: CustomerMap;
   productTypeMap: ProductTypeMap;
+  shopProfile: {             // ← add this
+    shop_name: string;
+    gstin: string;
+    phone: string;
+    address: string;
+    city: string;
+    state: string;
+    pincode: string;
+  };
 }) {
   const customer = customerMap[bill.customerId];
   const shop = getShopHeader();
@@ -171,10 +184,10 @@ function CusInvoice({
         <tbody>
           <tr>
             <td style={{ fontSize: "12px", paddingBottom: "1mm" }}>
-              GSTIN : <strong>{shop.gstin}</strong>
+              GSTIN : <strong>{shopProfile.gstin || shop.gstin}</strong>
             </td>
             <td style={{ textAlign: "right", fontSize: "12px", paddingBottom: "1mm" }}>
-              Phone : <strong>{shop.phone}</strong>
+              Phone : <strong>{shopProfile.phone || shop.phone}</strong>
             </td>
           </tr>
         </tbody>
@@ -182,10 +195,10 @@ function CusInvoice({
 
       <div style={{ textAlign: "center", borderTop: "3px double #000", borderBottom: "3px double #000", padding: "4mm 0", marginBottom: "4mm" }}>
         <div style={{ fontSize: "28px", fontWeight: "bold", letterSpacing: "4px", textTransform: "uppercase" }}>
-          {shop.name}
+          {shopProfile.shop_name || shop.name}
         </div>
         <div style={{ fontSize: "13px", marginTop: "2mm" }}>
-          {shop.address}
+          {shopProfile.address || shop.address}
         </div>
       </div>
 
@@ -412,11 +425,20 @@ function VyabariShopHeader({ bill, customer, page, totalPages, goldRate, silverR
 function VyabariInvoice({
   bill,
   customerMap,
-  productTypeMap,
+  productTypeMap
 }: {
   bill: Bill;
   customerMap: CustomerMap;
   productTypeMap: ProductTypeMap;
+  shopProfile: {             // ← add this
+    shop_name: string;
+    gstin: string;
+    phone: string;
+    address: string;
+    city: string;
+    state: string;
+    pincode: string;
+  };
 }) {
   const customer = customerMap[bill.customerId];
   const sgst = +(bill.gstAmount / 2).toFixed(2);
@@ -612,6 +634,8 @@ function BillingPage() {
   const [invoiceBill, setInvoiceBill] = useState<Bill | null>(null);
   const [vybBill, setVybBill] = useState<Bill | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
+  const [shopProfile, setShopProfile] = useState<any>(null);
+
 
   const [selectedOrderId, setSelectedOrderId] = useState("");
   const [discount, setDiscount] = useState("0");
@@ -758,6 +782,12 @@ function BillingPage() {
 
   const detailCustomer = detailBill ? customerMap[detailBill.customerId] : null;
 
+  useEffect(() => {
+    api.request('/shop/profile').then(res => {
+      if (res.ok) setShopProfile(res.data);
+    });
+  }, []);
+
   if (loading) {
     return (
       <AppLayout>
@@ -776,6 +806,8 @@ function BillingPage() {
     }
     return [];
   }
+
+
 
   return (
     <AppLayout>
@@ -1026,7 +1058,7 @@ function BillingPage() {
             </DialogHeader>
             <div ref={printRef} className="border border-border rounded-md overflow-auto max-h-[65vh] bg-white p-2">
               {invoiceBill && (
-                <CusInvoice bill={invoiceBill} customerMap={customerMap} productTypeMap={productTypeMap} />
+                <CusInvoice bill={invoiceBill} customerMap={customerMap} productTypeMap={productTypeMap} shopProfile={shopProfile} />
               )}
             </div>
             <DialogFooter>
@@ -1050,7 +1082,7 @@ function BillingPage() {
             </DialogHeader>
             <div className="border border-border rounded-md overflow-auto max-h-[65vh] bg-white p-2">
               {vybBill && (
-                <VyabariInvoice bill={vybBill} customerMap={customerMap} productTypeMap={productTypeMap} />
+                <VyabariInvoice bill={vybBill} customerMap={customerMap} productTypeMap={productTypeMap} shopProfile={shopProfile} />
               )}
             </div>
             <DialogFooter>

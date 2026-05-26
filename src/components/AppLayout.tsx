@@ -5,9 +5,9 @@ import { useState, useEffect, useCallback } from "react";
 import {
   LayoutDashboard, Package, Layers, Users, ShoppingCart,
   Warehouse, Receipt, FileText, Shield, Bell, Menu, Gem, LogOut,
+  Settings,
 } from "lucide-react";
 import { alertStore } from "@/lib/store";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
@@ -20,6 +20,7 @@ const navItems = [
   { to: "/billing", label: "Billing", icon: Receipt },
   { to: "/reports", label: "Reports", icon: FileText },
   { to: "/restrictions", label: "Restrictions", icon: Shield },
+  { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
 export function AppLayout({ children }: { children: React.ReactNode }) {

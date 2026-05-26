@@ -243,7 +243,7 @@ function OrdersPage() {
       const subtotal = finalItems.reduce((sum, i) => sum + i.amount, 0);
       const gstAmount = subtotal * 0.03;
 
-      await orderStore.add({
+      const orderCreateRes = await orderStore.add({
         customerId,
         items: finalItems,
         status: 'pending',
@@ -255,6 +255,8 @@ function OrdersPage() {
         paymentDueDate: paymentDueDate ? new Date(paymentDueDate).toISOString() : undefined,
         paymentReceived: false,
       });
+
+      console.log('Created order:', orderCreateRes);
 
       await fetchData();
       setDialogOpen(false);
