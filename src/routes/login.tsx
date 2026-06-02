@@ -118,7 +118,7 @@ function LoginPage() {
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-lg gold-gradient">
             <Gem className="h-6 w-6 text-primary-foreground" />
           </div>
-          <CardTitle className="font-heading text-2xl gold-text">Welcome back</CardTitle>
+          <CardTitle className="font-heading text-2xl gold-text">Welcome</CardTitle>
           <p className="text-sm text-muted-foreground mt-1">Sign in to your shop ERP</p>
         </CardHeader>
 
