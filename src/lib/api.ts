@@ -1,6 +1,9 @@
 // src/lib/api.ts
 //const API_BASE = 'http://localhost:5000/api';
-const API_BASE = 'https://sridhar.moiaccount.in/api';
+const API_BASE =
+  import.meta.env.VITE_API_BASE || 'http://localhost:5000/api';
+
+console.log('API Base URL:', API_BASE);
 
 const getToken = () => localStorage.getItem('token');
 
