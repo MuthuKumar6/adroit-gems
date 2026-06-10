@@ -4,7 +4,6 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 // static hosts like cPanel/Apache. The .htaccess in public/ rewrites
 // all routes back to index.html so client-side routing works.
 export default defineConfig({
-  cloudflare: false,
   tanstackStart: {
     spa: {
       enabled: true,
