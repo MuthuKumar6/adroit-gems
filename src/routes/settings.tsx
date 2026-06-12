@@ -23,6 +23,7 @@ function SettingsPage() {
     api.request('/shop/profile').then(res => {
       if (res.ok) {
         const d = res.data;
+        console.log('Shop profile data:', d);
         setForm({
           shopName: d.shop_name || '', ownerName: d.owner_name || '',
           phone: d.phone || '', gstin: d.gstin || '',
