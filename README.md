@@ -150,7 +150,7 @@ VITE_API_BASE=http://localhost:5000/api
 ## Linting
 
 ```bash
-bun run lint
+npm run lint
 ```
 
 ## Scripts Reference
