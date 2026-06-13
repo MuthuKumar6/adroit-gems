@@ -1,4 +1,9 @@
-# SPA routing for cPanel/Apache
+# SPA routing for cPanel / Apache
+# Works for both shared cPanel hosts and standard Apache setups.
+
+Options -MultiViews
+
+# Primary method: rewrite engine (most reliable on cPanel)
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
@@ -8,9 +13,18 @@
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
 
-  # Send everything else to index.html
+  # Send everything else to index.html (SPA fallback)
   RewriteRule ^ index.html [L]
 </IfModule>
+
+# Fallback method: if mod_rewrite is disabled, serve index.html for unmatched URLs
+<IfModule mod_dir.c>
+  DirectoryIndex index.html
+</IfModule>
+
+# Last-resort fallback: if Apache still returns 404, serve index.html
+# (This makes the browser receive the SPA shell on any missing path.)
+ErrorDocument 404 /index.html
 
 # Cache static assets aggressively
 <IfModule mod_expires.c>
@@ -21,6 +35,13 @@
   ExpiresByType image/jpeg "access plus 1 year"
   ExpiresByType image/svg+xml "access plus 1 year"
   ExpiresByType font/woff2 "access plus 1 year"
+</IfModule>
+
+# Do not cache index.html (so updates roll out immediately)
+<IfModule mod_headers.c>
+  <FilesMatch "index\.html$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+  </FilesMatch>
 </IfModule>
 
 # Gzip compression

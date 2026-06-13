@@ -1,97 +1,87 @@
 # cPanel Deployment Guide (Fix 404 on Refresh)
 
-This app is a **Single Page Application (SPA)**. All routing is handled client-side by TanStack Router. When you refresh a page like `/products` or `/orders`, the browser asks Apache for that path directly. Apache doesn't find a file at that path and returns **404 Not Found**.
+This app is a **Single Page Application (SPA)**. All routing is handled in the browser by TanStack Router. When you refresh a page like `/product-types`, Apache looks for a real file at that path, doesn't find one, and returns **404 Not Found**.
 
-The fix is to tell Apache: *"For any URL that isn't a real file, serve `index.html` and let the JavaScript router handle it."* This is done with a `.htaccess` file.
+The fix is a `.htaccess` file that tells Apache to serve `index.html` for any URL that isn't a real file. The JavaScript router then renders the correct page.
+
+---
+
+## TL;DR — Why `/` works but `/product-types` 404s
+
+- `/` works because Apache serves `index.html` automatically (the `DirectoryIndex`).
+- `/product-types` fails because Apache looks for a folder/file called `product-types` and doesn't find one.
+- The `.htaccess` file rewrites every unmatched URL back to `index.html`. **If 404 still happens after deploy, the `.htaccess` file did not get uploaded** (it's hidden by default).
 
 ---
 
 ## 1. Build the App
 
 ```bash
-# Clean build (recommended)
 rm -rf node_modules/.vite dist
 npm install
 npm run build
 ```
 
-Output: `dist/client/`
+Output: **`dist/client/`** (not `dist/`).
 
-### If build fails with `sh: 1: vite: not found`
-
-That error means dependencies are not installed, so the local Vite executable is missing.
-
-Run this from the project root:
-
-```bash
-npm install
-npm run build
-```
-
-Important notes:
-- Run `npm install` before `npm run build`
-- Do **not** run `npm install --production` or `npm install --omit=dev` before building
-- Use Node.js 20+ on your local machine or hosting build environment
-- After a successful build, upload the contents of `dist/client/`, not the whole `dist/` folder
+If `npm run build` fails with `sh: 1: vite: not found`, you skipped `npm install` (or used `--production` / `--omit=dev`). Run a plain `npm install` first.
 
 ---
 
-## 2. Verify `.htaccess` Exists in the Build Output
+## 2. Confirm `.htaccess` Is in the Build Output
 
-After building, confirm this file exists:
-
-```
-dist/client/.htaccess
+```bash
+ls -la dist/client/.htaccess
 ```
 
-It should contain:
+It must exist. Its contents should match `public/.htaccess` in this repo:
 
 ```apache
+Options -MultiViews
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
-
-  # Don't rewrite real files or directories
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
-
-  # Send everything else to index.html
   RewriteRule ^ index.html [L]
 </IfModule>
+
+ErrorDocument 404 /index.html
 ```
 
-If it's missing, copy `public/.htaccess` into `dist/client/` manually.
+The `ErrorDocument 404 /index.html` line is a safety net — even if `mod_rewrite` is disabled on your host, deep links still load.
 
 ---
 
-## 3. Upload to cPanel — Include Hidden Files
+## 3. Upload to cPanel — INCLUDE HIDDEN FILES
 
-Upload **all contents** of `dist/client/` into your cPanel `public_html/` directory (or your subfolder).
+Upload **all contents** of `dist/client/` into `public_html/` (or your subfolder).
 
-> **Important:** `.htaccess` starts with a dot and is **hidden by default**. Most upload tools skip it.
+> `.htaccess` starts with a dot and is **hidden by default**. 90% of "still 404 after deploy" issues are caused by this file not being uploaded.
 
-### File Manager (cPanel)
-1. Open **File Manager**
-2. Top-right → **Settings** → check **Show Hidden Files (dotfiles)** → Save
-3. Upload all files from `dist/client/` including `.htaccess`
+### cPanel File Manager
+1. Open **File Manager** → top-right **Settings**
+2. Check **Show Hidden Files (dotfiles)** → Save
+3. Upload all files from `dist/client/`
 
-### FTP (FileZilla)
+### FileZilla / FTP
 1. Menu → **Server** → **Force showing hidden files**
 2. Upload all files from `dist/client/`
 
-### ZIP Upload (recommended)
+### ZIP method (most reliable)
 ```bash
 cd dist/client
 zip -r ../site.zip . .htaccess
 ```
-Then upload `site.zip` to cPanel and use **Extract**.
+Upload `site.zip` to cPanel, then **Extract** in File Manager.
 
 ---
 
 ## 4. Verify on the Server
 
-After upload, your `public_html/` should contain at minimum:
+In cPanel File Manager (with hidden files shown), `public_html/` must contain:
 
 ```
 public_html/
@@ -101,48 +91,52 @@ public_html/
 └── ...
 ```
 
-Test in browser:
-- Visit `https://yourdomain.com/` → loads
-- Visit `https://yourdomain.com/products` → loads
-- Press **F5** on `/products` → should still load (no 404)
+Test:
+- `https://yourdomain.com/` → loads ✓
+- `https://yourdomain.com/product-types` → loads ✓
+- Press **F5** on `/product-types` → still loads, no 404 ✓
 
 ---
 
-## 5. Common Problems
+## 5. Still Getting 404? Checklist
 
-### Still 404 after upload
-- `.htaccess` was not uploaded → re-check hidden files setting
-- `mod_rewrite` not enabled → contact hosting support (it's enabled on almost all shared cPanel hosts)
-- Hosting provider overrides `.htaccess` → ask support to allow `AllowOverride All`
+Run through these in order:
 
-### App is in a subfolder (e.g. `public_html/app/`)
-Edit `public/.htaccess` **before building** and change:
-```apache
-RewriteBase /
-```
-to:
-```apache
-RewriteBase /app/
-```
-Then rebuild and re-upload.
+1. **Is `.htaccess` actually on the server?**
+   File Manager → Settings → Show Hidden Files → look in `public_html/`.
+   If it's not there, re-upload it (most common cause).
 
-### Assets not loading (blank page)
-If the app is in a subfolder, also update `vite.config.ts`:
-```ts
-export default defineConfig({
-  base: '/app/',
-  // ... rest of config
-})
-```
-Rebuild and re-upload.
+2. **Is `mod_rewrite` enabled?**
+   On shared cPanel hosts it almost always is. If not, contact support.
+   Even without it, the `ErrorDocument 404 /index.html` line in the new
+   `.htaccess` should still serve the SPA.
 
-### Nginx (not Apache)
-`.htaccess` is ignored by Nginx. Add this to your server block instead:
-```nginx
-location / {
-  try_files $uri $uri/ /index.html;
-}
-```
+3. **Does the host allow `.htaccess` overrides?**
+   Ask support to confirm `AllowOverride All` is enabled for your account.
+
+4. **Is your app in a subfolder?** (e.g. `public_html/app/`)
+   Edit `public/.htaccess` **before building**:
+   ```apache
+   RewriteBase /app/
+   ```
+   ```apache
+   ErrorDocument 404 /app/index.html
+   ```
+   And in `vite.config.ts`:
+   ```ts
+   export default defineConfig({
+     base: '/app/',
+   })
+   ```
+   Rebuild and re-upload.
+
+5. **Are you on Nginx, not Apache?**
+   `.htaccess` is ignored by Nginx. Add this to your server block:
+   ```nginx
+   location / {
+     try_files $uri $uri/ /index.html;
+   }
+   ```
 
 ---
 
@@ -150,8 +144,8 @@ location / {
 
 - [ ] Ran `npm install`
 - [ ] Ran `npm run build`
-- [ ] `dist/client/.htaccess` exists
+- [ ] `dist/client/.htaccess` exists locally
 - [ ] Uploaded **all** files from `dist/client/` to `public_html/`
-- [ ] **Hidden files were shown** during upload
+- [ ] Hidden files were shown during upload
 - [ ] `public_html/.htaccess` exists on the server
-- [ ] Refresh on a deep link (e.g. `/products`) works without 404
+- [ ] F5 on `/product-types` no longer returns 404
