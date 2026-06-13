@@ -37,8 +37,8 @@ A full-stack jewellery wholesale management system built with **TanStack Start**
 
 ## Prerequisites
 
-- [Bun](https://bun.sh) v1.1 or later
-- Node.js 20+ (for compatibility; Bun is preferred)
+- Node.js 20+
+- npm 10+ (included with Node.js)
 
 ## Installation
 
@@ -48,14 +48,14 @@ git clone <repo-url>
 cd tanstack_start_ts
 
 # Install dependencies
-bun install
+npm install
 ```
 
 ## Development
 
 ```bash
 # Start the dev server
-bun run dev
+npm run dev
 ```
 
 The app will be available at `http://localhost:5173` (or the next open port).
@@ -64,7 +64,7 @@ The app will be available at `http://localhost:5173` (or the next open port).
 
 ```bash
 # Production build (outputs to dist/client)
-bun run build
+npm run build
 ```
 
 The build command:
@@ -75,15 +75,28 @@ The build command:
 
 ```bash
 # Clear all caches and rebuild
-rm -rf node_modules/.vite dist .bun-cache
-bun install
-bun run build
+rm -rf node_modules/.vite dist
+npm install
+npm run build
 ```
+
+### Fix: `sh: 1: vite: not found`
+
+This means project dependencies are not installed, so `node_modules/.bin/vite` does not exist.
+
+Run these commands from the project root:
+
+```bash
+npm install
+npm run build
+```
+
+Do **not** use `npm install --production` or `npm install --omit=dev` before building, because build tools like Vite are installed from `devDependencies`.
 
 ## Preview Production Build
 
 ```bash
-bun run preview
+npm run preview
 ```
 
 ## Project Structure
@@ -137,18 +150,18 @@ VITE_API_BASE=http://localhost:5000/api
 ## Linting
 
 ```bash
-bun run lint
+npm run lint
 ```
 
 ## Scripts Reference
 
 | Script | Description |
 |--------|-------------|
-| `bun run dev` | Start Vite development server |
-| `bun run build` | Production build → `dist/client` |
-| `bun run build:dev` | Development mode build |
-| `bun run preview` | Preview production build locally |
-| `bun run lint` | Run ESLint |
+| `npm run dev` | Start Vite development server |
+| `npm run build` | Production build → `dist/client` |
+| `npm run build:dev` | Development mode build |
+| `npm run preview` | Preview production build locally |
+| `npm run lint` | Run ESLint |
 
 ## Notes
 
