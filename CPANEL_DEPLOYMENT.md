@@ -11,11 +11,28 @@ The fix is to tell Apache: *"For any URL that isn't a real file, serve `index.ht
 ```bash
 # Clean build (recommended)
 rm -rf node_modules/.vite dist
-bun install
-bun run build
+npm install
+npm run build
 ```
 
 Output: `dist/client/`
+
+### If build fails with `sh: 1: vite: not found`
+
+That error means dependencies are not installed, so the local Vite executable is missing.
+
+Run this from the project root:
+
+```bash
+npm install
+npm run build
+```
+
+Important notes:
+- Run `npm install` before `npm run build`
+- Do **not** run `npm install --production` or `npm install --omit=dev` before building
+- Use Node.js 20+ on your local machine or hosting build environment
+- After a successful build, upload the contents of `dist/client/`, not the whole `dist/` folder
 
 ---
 
@@ -131,7 +148,8 @@ location / {
 
 ## Quick Checklist
 
-- [ ] Ran `bun run build`
+- [ ] Ran `npm install`
+- [ ] Ran `npm run build`
 - [ ] `dist/client/.htaccess` exists
 - [ ] Uploaded **all** files from `dist/client/` to `public_html/`
 - [ ] **Hidden files were shown** during upload
