@@ -7,6 +7,10 @@ import { useProducts, useProductTypes } from "@/lib/queries";
 import type { ProductType, Product } from "@/lib/types";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
+import { useTableData } from "@/hooks/useTableData";
+import { TableToolbar } from "@/components/TableToolbar";
+import { TablePagination } from "@/components/TablePagination";
+import type { ExportColumn } from "@/lib/exportUtils";
 
 export const Route = createFileRoute("/stock")({
   component: StockPage,
@@ -40,6 +44,29 @@ function StockPage() {
     );
   }
 
+  const productOf = (pt: ProductType) => products.find(p => p.id === pt.product_id);
+  const exportColumns: ExportColumn<ProductType>[] = [
+    { header: "Product Type", accessor: (pt) => pt.name },
+    { header: "Metal", accessor: (pt) => { const pr = productOf(pt); return `${pr?.name ?? ""} ${pr?.purity ?? ""}`.trim(); } },
+    { header: "Net Weight/pc (g)", accessor: (pt) => Number(pt.net_weight || 0) },
+    { header: "In Stock", accessor: (pt) => Number(pt.in_stock || 0) },
+    { header: "Total Qty", accessor: (pt) => Number(pt.quantity || 0) },
+    { header: "Stock Weight (g)", accessor: (pt) => +((pt.in_stock || 0) * (pt.net_weight || 0)).toFixed(2) },
+    { header: "Status", accessor: (pt) => (pt.in_stock <= 0 ? "Out of Stock" : pt.in_stock <= 3 ? "Low Stock" : "Good") },
+  ];
+  const table = useTableData<ProductType>(
+    productTypes,
+    (pt, q) => {
+      const pr = productOf(pt);
+      return (
+        pt.name.toLowerCase().includes(q) ||
+        (pr?.name || "").toLowerCase().includes(q) ||
+        (pr?.purity || "").toLowerCase().includes(q)
+      );
+    },
+    10,
+  );
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -47,6 +74,7 @@ function StockPage() {
           <h1 className="text-2xl lg:text-3xl font-heading font-bold gold-text">Stock Monitor</h1>
           <p className="text-muted-foreground text-sm mt-1">Real-time inventory tracking</p>
         </div>
+
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Card className="glass-card border-border/50">
