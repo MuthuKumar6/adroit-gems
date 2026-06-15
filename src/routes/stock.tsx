@@ -133,6 +133,16 @@ function StockPage() {
           </CardContent>
         </Card>
 
+        <TableToolbar
+          search={table.search}
+          onSearchChange={table.setSearch}
+          placeholder="Search by product type or metal..."
+          exportRows={table.filtered}
+          exportColumns={exportColumns}
+          exportFilename="stock"
+          exportTitle="Stock Report"
+        />
+
         <Card className="glass-card border-border/50">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-muted-foreground">Stock Details</CardTitle>
@@ -152,10 +162,8 @@ function StockPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {productTypes.map(pt => {
+                  {table.paged.map(pt => {
                     const product = products.find(p => p.id === pt.product_id);
-                    const stockPct = pt.quantity > 0 ? Math.round((pt.in_stock / pt.quantity) * 100) : 0;
-
                     return (
                       <TableRow key={pt.id}>
                         <TableCell className="font-medium">{pt.name}</TableCell>
@@ -182,7 +190,7 @@ function StockPage() {
                       </TableRow>
                     );
                   })}
-                  {productTypes.length === 0 && (
+                  {table.paged.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center text-muted-foreground py-12">
                         No stock data available
@@ -192,6 +200,13 @@ function StockPage() {
                 </TableBody>
               </Table>
             </div>
+            <TablePagination
+              page={table.page}
+              totalPages={table.totalPages}
+              totalCount={table.totalCount}
+              pageSize={table.pageSize}
+              onPageChange={table.setPage}
+            />
           </CardContent>
         </Card>
       </div>
