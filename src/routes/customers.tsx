@@ -148,6 +148,16 @@ function CustomersPage() {
           </Button>
         </div>
 
+        <TableToolbar
+          search={table.search}
+          onSearchChange={table.setSearch}
+          placeholder="Search by name, phone, email, GSTIN..."
+          exportRows={table.filtered}
+          exportColumns={exportColumns}
+          exportFilename="customers"
+          exportTitle="Customers"
+        />
+
         <Card className="glass-card border-border/50">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -169,14 +179,14 @@ function CustomersPage() {
                         <Loader2 className="animate-spin mx-auto h-6 w-6" />
                       </TableCell>
                     </TableRow>
-                  ) : customers.length === 0 ? (
+                  ) : table.paged.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center text-muted-foreground py-12">
                         No customers found
                       </TableCell>
                     </TableRow>
                   ) : (
-                    customers.map((c: Customer) => (
+                    table.paged.map((c: Customer) => (
                       <TableRow key={c.id}>
                         <TableCell className="font-medium">{c.name}</TableCell>
                         <TableCell>{c.phone}</TableCell>
@@ -200,6 +210,13 @@ function CustomersPage() {
                 </TableBody>
               </Table>
             </div>
+            <TablePagination
+              page={table.page}
+              totalPages={table.totalPages}
+              totalCount={table.totalCount}
+              pageSize={table.pageSize}
+              onPageChange={table.setPage}
+            />
           </CardContent>
         </Card>
 
