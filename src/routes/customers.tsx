@@ -15,6 +15,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, Eye, Loader2 } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
+import { useTableData } from "@/hooks/useTableData";
+import { TableToolbar } from "@/components/TableToolbar";
+import { TablePagination } from "@/components/TablePagination";
+import type { ExportColumn } from "@/lib/exportUtils";
 
 export const Route = createFileRoute("/customers")({
   component: CustomersPage,
@@ -53,6 +57,25 @@ function CustomersPage() {
   const detailOrders = useMemo(
     () => (detailCustomer ? orders.filter((o: Order) => o.customer_id === detailCustomer.id) : []),
     [detailCustomer, orders],
+  );
+
+  const exportColumns: ExportColumn<Customer>[] = [
+    { header: "Name", accessor: (c) => c.name },
+    { header: "Phone", accessor: (c) => c.phone },
+    { header: "Email", accessor: (c) => c.email || "" },
+    { header: "GSTIN", accessor: (c) => c.gstin || "" },
+    { header: "Address", accessor: (c) => c.address || "" },
+    { header: "Daily Limit (g)", accessor: (c) => Number(c.daily_gram_limit || 0) },
+    { header: "Orders", accessor: (c) => orderCountMap[c.id] ?? 0 },
+  ];
+  const table = useTableData<Customer>(
+    customers,
+    (c, q) =>
+      c.name.toLowerCase().includes(q) ||
+      (c.phone || "").toLowerCase().includes(q) ||
+      (c.email || "").toLowerCase().includes(q) ||
+      (c.gstin || "").toLowerCase().includes(q),
+    10,
   );
 
   const form = useForm<CustomerFormValues>({
