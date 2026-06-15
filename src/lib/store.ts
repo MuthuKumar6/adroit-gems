@@ -217,3 +217,8 @@ export const restrictionStore = {
     }
   },
 };
+
+export const profileStore = {
+  get: () => api.request('/profile'),
+  update: (data: any) => api.request('/profile', { method: 'PUT', body: JSON.stringify(data) }),
+};
