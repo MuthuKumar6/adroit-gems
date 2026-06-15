@@ -357,6 +357,13 @@ function ProductTypesPage() {
                 </TableBody>
               </Table>
             </div>
+            <TablePagination
+              page={table.page}
+              totalPages={table.totalPages}
+              totalCount={table.totalCount}
+              pageSize={table.pageSize}
+              onPageChange={table.setPage}
+            />
           </CardContent>
         </Card>
 
