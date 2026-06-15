@@ -368,6 +368,16 @@ function OrdersPage() {
           ))}
         </div>
 
+        <TableToolbar
+          search={table.search}
+          onSearchChange={table.setSearch}
+          placeholder="Search by order #, customer, status..."
+          exportRows={table.filtered}
+          exportColumns={exportColumns}
+          exportFilename="orders"
+          exportTitle="Orders"
+        />
+
         <Card className="glass-card border-border/50">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -392,12 +402,12 @@ function OrdersPage() {
                         <Loader2 className="animate-spin mx-auto h-6 w-6" />
                       </TableCell>
                     </TableRow>
-                  ) : filteredOrders.length === 0 ? (
+                  ) : table.paged.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={9} className="text-center text-muted-foreground py-12">No orders found</TableCell>
                     </TableRow>
                   ) : (
-                    filteredOrders.map(o => {
+                    table.paged.map(o => {
                       const customer = customers.find(c => c.id === o.customer_id);
                       const locked = isOrderLocked(o.id, billedOrderIds);
                       const nextOptions = allowedNextStatuses(o.status);
@@ -449,8 +459,16 @@ function OrdersPage() {
                 </TableBody>
               </Table>
             </div>
+            <TablePagination
+              page={table.page}
+              totalPages={table.totalPages}
+              totalCount={table.totalCount}
+              pageSize={table.pageSize}
+              onPageChange={table.setPage}
+            />
           </CardContent>
         </Card>
+
 
         {/* New Order Dialog */}
         <Dialog open={dialogOpen} onOpenChange={(open) => {
