@@ -24,6 +24,10 @@ import {
   isOrderLocked,
   validateTransition,
 } from "@/lib/orderFlow";
+import { useTableData } from "@/hooks/useTableData";
+import { TableToolbar } from "@/components/TableToolbar";
+import { TablePagination } from "@/components/TablePagination";
+import type { ExportColumn } from "@/lib/exportUtils";
 
 export const Route = createFileRoute("/orders")({
   component: OrdersPage,
@@ -104,6 +108,28 @@ function OrdersPage() {
   const filteredOrders = statusFilter === 'all'
     ? orders
     : orders.filter(o => o.status === statusFilter);
+
+  const customerName = (id: string) => customers.find(c => c.id === id)?.name || 'Unknown';
+  const exportColumns: ExportColumn<Order>[] = [
+    { header: "Order #", accessor: (o) => o.order_number },
+    { header: "Customer", accessor: (o) => customerName(o.customer_id) },
+    { header: "Items", accessor: (o) => o.items?.length ?? 0 },
+    { header: "Weight (g)", accessor: (o) => Number(o.total_weight || 0) },
+    { header: "Subtotal", accessor: (o) => Number(o.subtotal || 0) },
+    { header: "GST", accessor: (o) => Number(o.gst_amount || 0) },
+    { header: "Total", accessor: (o) => Number(o.total_amount || 0) },
+    { header: "Status", accessor: (o) => o.status },
+    { header: "Payment Due", accessor: (o) => o.payment_due_date ? new Date(o.payment_due_date).toLocaleDateString() : "" },
+    { header: "Created", accessor: (o) => new Date(o.created_at).toLocaleDateString() },
+  ];
+  const table = useTableData<Order>(
+    filteredOrders,
+    (o, q) =>
+      (o.order_number || '').toLowerCase().includes(q) ||
+      customerName(o.customer_id).toLowerCase().includes(q) ||
+      (o.status || '').toLowerCase().includes(q),
+    10,
+  );
 
   const addItem = () => setOrderItems([...orderItems, { productTypeId: '', quantity: 1, huids: '' }]);
 
@@ -342,6 +368,16 @@ function OrdersPage() {
           ))}
         </div>
 
+        <TableToolbar
+          search={table.search}
+          onSearchChange={table.setSearch}
+          placeholder="Search by order #, customer, status..."
+          exportRows={table.filtered}
+          exportColumns={exportColumns}
+          exportFilename="orders"
+          exportTitle="Orders"
+        />
+
         <Card className="glass-card border-border/50">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -366,12 +402,12 @@ function OrdersPage() {
                         <Loader2 className="animate-spin mx-auto h-6 w-6" />
                       </TableCell>
                     </TableRow>
-                  ) : filteredOrders.length === 0 ? (
+                  ) : table.paged.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={9} className="text-center text-muted-foreground py-12">No orders found</TableCell>
                     </TableRow>
                   ) : (
-                    filteredOrders.map(o => {
+                    table.paged.map(o => {
                       const customer = customers.find(c => c.id === o.customer_id);
                       const locked = isOrderLocked(o.id, billedOrderIds);
                       const nextOptions = allowedNextStatuses(o.status);
@@ -423,8 +459,16 @@ function OrdersPage() {
                 </TableBody>
               </Table>
             </div>
+            <TablePagination
+              page={table.page}
+              totalPages={table.totalPages}
+              totalCount={table.totalCount}
+              pageSize={table.pageSize}
+              onPageChange={table.setPage}
+            />
           </CardContent>
         </Card>
+
 
         {/* New Order Dialog */}
         <Dialog open={dialogOpen} onOpenChange={(open) => {

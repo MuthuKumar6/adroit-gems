@@ -25,6 +25,10 @@ import { qk } from "@/lib/queries";
 import { Receipt, Eye, Printer } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { useTableData } from "@/hooks/useTableData";
+import { TableToolbar } from "@/components/TableToolbar";
+import { TablePagination } from "@/components/TablePagination";
+import type { ExportColumn } from "@/lib/exportUtils";
 
 // Reads the active shop from localStorage and falls back to legacy hardcoded
 // values so existing tenants keep printing correctly until they fill in their
@@ -809,6 +813,36 @@ function BillingPage() {
 
 
 
+  const billExportColumns: ExportColumn<Bill>[] = [
+    { header: "Bill #", accessor: (b) => b.billNumber },
+    { header: "Order #", accessor: (b) => orderMap[b.orderId]?.order_number || "" },
+    { header: "Customer", accessor: (b) => customerMap[b.customerId]?.name || "" },
+    { header: "Subtotal", accessor: (b) => Number(b.subtotal || 0) },
+    { header: "GST", accessor: (b) => Number(b.gstAmount || 0) },
+    { header: "Discount", accessor: (b) => Number(b.discount || 0) },
+    { header: "Total", accessor: (b) => Number(b.totalAmount || 0) },
+    { header: "Paid", accessor: (b) => Number(b.paidAmount || 0) },
+    { header: "Balance", accessor: (b) => Number(b.balanceAmount || 0) },
+    { header: "Payment Method", accessor: (b) => b.paymentMethod || "" },
+    { header: "Status", accessor: (b) => b.status || "" },
+    { header: "Date", accessor: (b) => new Date(b.createdAt).toLocaleDateString() },
+  ];
+  const billTable = useTableData<Bill>(
+    bills,
+    (b, q) => {
+      const cust = customerMap[b.customerId]?.name || "";
+      const ord = orderMap[b.orderId]?.order_number || "";
+      return (
+        (b.billNumber || "").toLowerCase().includes(q) ||
+        ord.toLowerCase().includes(q) ||
+        cust.toLowerCase().includes(q) ||
+        (b.status || "").toLowerCase().includes(q) ||
+        (b.paymentMethod || "").toLowerCase().includes(q)
+      );
+    },
+    10,
+  );
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -821,6 +855,16 @@ function BillingPage() {
             <Receipt className="h-4 w-4 mr-2" /> Create Bill
           </Button>
         </div>
+
+        <TableToolbar
+          search={billTable.search}
+          onSearchChange={billTable.setSearch}
+          placeholder="Search by bill #, order #, customer, status..."
+          exportRows={billTable.filtered}
+          exportColumns={billExportColumns}
+          exportFilename="bills"
+          exportTitle="Bills"
+        />
 
         <Card className="glass-card border-border/50">
           <CardContent className="p-0">
@@ -840,7 +884,7 @@ function BillingPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {bills.map((b) => {
+                  {billTable.paged.map((b) => {
                     const customer = customerMap[b.customerId];
                     const order = orderMap[b.orderId];
                     return (
@@ -892,7 +936,7 @@ function BillingPage() {
                       </TableRow>
                     );
                   })}
-                  {bills.length === 0 && (
+                  {billTable.paged.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                         No bills yet
@@ -902,8 +946,16 @@ function BillingPage() {
                 </TableBody>
               </Table>
             </div>
+            <TablePagination
+              page={billTable.page}
+              totalPages={billTable.totalPages}
+              totalCount={billTable.totalCount}
+              pageSize={billTable.pageSize}
+              onPageChange={billTable.setPage}
+            />
           </CardContent>
         </Card>
+
 
         {/* ── Create Bill Dialog ── */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

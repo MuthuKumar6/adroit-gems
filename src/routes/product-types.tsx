@@ -15,6 +15,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
+import { useTableData } from "@/hooks/useTableData";
+import { TableToolbar } from "@/components/TableToolbar";
+import { TablePagination } from "@/components/TablePagination";
+import type { ExportColumn } from "@/lib/exportUtils";
 
 export const Route = createFileRoute("/product-types")({
   component: ProductTypesPage,
@@ -192,6 +196,29 @@ function ProductTypesPage() {
     }
   };
 
+  const exportColumns: ExportColumn<ProductType>[] = [
+    { header: "Name", accessor: (pt) => pt.name },
+    { header: "Tag No", accessor: (pt) => pt.tag_no || "" },
+    { header: "Metal", accessor: (pt) => `${(pt as any).productName ?? ""} ${(pt as any).purity ?? ""}`.trim() },
+    { header: "Taxable", accessor: (pt) => (pt.taxable ? "Yes" : "No") },
+    { header: "HUIDs", accessor: (pt) => toArray(pt.huids).join(", ") },
+    { header: "Gross Wt (g)", accessor: (pt) => Number(pt.gross_weight || 0) },
+    { header: "Net Wt (g)", accessor: (pt) => Number(pt.net_weight || 0) },
+    { header: "Wastage %", accessor: (pt) => Number(pt.wastage_percentage || 0) },
+    { header: "Making", accessor: (pt) => `${pt.making_charges}/${pt.making_charge_type === "per_gram" ? "g" : "flat"}` },
+    { header: "In Stock", accessor: (pt) => Number(pt.in_stock || 0) },
+    { header: "Total Qty", accessor: (pt) => Number(pt.quantity || 0) },
+  ];
+  const table = useTableData<ProductType>(
+    items,
+    (pt, q) =>
+      pt.name.toLowerCase().includes(q) ||
+      (pt.tag_no || "").toLowerCase().includes(q) ||
+      String((pt as any).productName || "").toLowerCase().includes(q) ||
+      toArray(pt.huids).some((h) => h.toLowerCase().includes(q)),
+    10,
+  );
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -206,6 +233,17 @@ function ProductTypesPage() {
             <Plus className="h-4 w-4 mr-2" /> Add Type
           </Button>
         </div>
+
+        <TableToolbar
+          search={table.search}
+          onSearchChange={table.setSearch}
+          placeholder="Search by name, tag, metal, HUID..."
+          exportRows={table.filtered}
+          exportColumns={exportColumns}
+          exportFilename="product-types"
+          exportTitle="Product Types"
+        />
+
 
         {/* Table */}
         <Card className="glass-card border-border/50">
@@ -233,14 +271,14 @@ function ProductTypesPage() {
                         <Loader2 className="animate-spin mx-auto h-6 w-6" />
                       </TableCell>
                     </TableRow>
-                  ) : items.length === 0 ? (
+                  ) : table.paged.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={10} className="text-center text-muted-foreground py-12">
                         No product types found
                       </TableCell>
                     </TableRow>
                   ) : (
-                    items.map((pt) => (
+                    table.paged.map((pt) => (
                       <TableRow key={pt.id}>
 
                         {/* Name + sub names preview */}
@@ -319,6 +357,13 @@ function ProductTypesPage() {
                 </TableBody>
               </Table>
             </div>
+            <TablePagination
+              page={table.page}
+              totalPages={table.totalPages}
+              totalCount={table.totalCount}
+              pageSize={table.pageSize}
+              onPageChange={table.setPage}
+            />
           </CardContent>
         </Card>
 
