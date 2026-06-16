@@ -14,10 +14,13 @@ import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as RestrictionsRouteImport } from './routes/restrictions'
 import { Route as ReportsRouteImport } from './routes/reports'
+import { Route as RatesRouteImport } from './routes/rates'
 import { Route as ProductsRouteImport } from './routes/products'
 import { Route as ProductTypesRouteImport } from './routes/product-types'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as LedgerRouteImport } from './routes/ledger'
+import { Route as KarigarsRouteImport } from './routes/karigars'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as BillingRouteImport } from './routes/billing'
 import { Route as IndexRouteImport } from './routes/index'
@@ -47,6 +50,11 @@ const ReportsRoute = ReportsRouteImport.update({
   path: '/reports',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RatesRoute = RatesRouteImport.update({
+  id: '/rates',
+  path: '/rates',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProductsRoute = ProductsRouteImport.update({
   id: '/products',
   path: '/products',
@@ -65,6 +73,16 @@ const OrdersRoute = OrdersRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LedgerRoute = LedgerRouteImport.update({
+  id: '/ledger',
+  path: '/ledger',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KarigarsRoute = KarigarsRouteImport.update({
+  id: '/karigars',
+  path: '/karigars',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CustomersRoute = CustomersRouteImport.update({
@@ -87,10 +105,13 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/billing': typeof BillingRoute
   '/customers': typeof CustomersRoute
+  '/karigars': typeof KarigarsRoute
+  '/ledger': typeof LedgerRoute
   '/login': typeof LoginRoute
   '/orders': typeof OrdersRoute
   '/product-types': typeof ProductTypesRoute
   '/products': typeof ProductsRoute
+  '/rates': typeof RatesRoute
   '/reports': typeof ReportsRoute
   '/restrictions': typeof RestrictionsRoute
   '/settings': typeof SettingsRoute
@@ -101,10 +122,13 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/billing': typeof BillingRoute
   '/customers': typeof CustomersRoute
+  '/karigars': typeof KarigarsRoute
+  '/ledger': typeof LedgerRoute
   '/login': typeof LoginRoute
   '/orders': typeof OrdersRoute
   '/product-types': typeof ProductTypesRoute
   '/products': typeof ProductsRoute
+  '/rates': typeof RatesRoute
   '/reports': typeof ReportsRoute
   '/restrictions': typeof RestrictionsRoute
   '/settings': typeof SettingsRoute
@@ -116,10 +140,13 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/billing': typeof BillingRoute
   '/customers': typeof CustomersRoute
+  '/karigars': typeof KarigarsRoute
+  '/ledger': typeof LedgerRoute
   '/login': typeof LoginRoute
   '/orders': typeof OrdersRoute
   '/product-types': typeof ProductTypesRoute
   '/products': typeof ProductsRoute
+  '/rates': typeof RatesRoute
   '/reports': typeof ReportsRoute
   '/restrictions': typeof RestrictionsRoute
   '/settings': typeof SettingsRoute
@@ -132,10 +159,13 @@ export interface FileRouteTypes {
     | '/'
     | '/billing'
     | '/customers'
+    | '/karigars'
+    | '/ledger'
     | '/login'
     | '/orders'
     | '/product-types'
     | '/products'
+    | '/rates'
     | '/reports'
     | '/restrictions'
     | '/settings'
@@ -146,10 +176,13 @@ export interface FileRouteTypes {
     | '/'
     | '/billing'
     | '/customers'
+    | '/karigars'
+    | '/ledger'
     | '/login'
     | '/orders'
     | '/product-types'
     | '/products'
+    | '/rates'
     | '/reports'
     | '/restrictions'
     | '/settings'
@@ -160,10 +193,13 @@ export interface FileRouteTypes {
     | '/'
     | '/billing'
     | '/customers'
+    | '/karigars'
+    | '/ledger'
     | '/login'
     | '/orders'
     | '/product-types'
     | '/products'
+    | '/rates'
     | '/reports'
     | '/restrictions'
     | '/settings'
@@ -175,10 +211,13 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BillingRoute: typeof BillingRoute
   CustomersRoute: typeof CustomersRoute
+  KarigarsRoute: typeof KarigarsRoute
+  LedgerRoute: typeof LedgerRoute
   LoginRoute: typeof LoginRoute
   OrdersRoute: typeof OrdersRoute
   ProductTypesRoute: typeof ProductTypesRoute
   ProductsRoute: typeof ProductsRoute
+  RatesRoute: typeof RatesRoute
   ReportsRoute: typeof ReportsRoute
   RestrictionsRoute: typeof RestrictionsRoute
   SettingsRoute: typeof SettingsRoute
@@ -223,6 +262,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReportsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/rates': {
+      id: '/rates'
+      path: '/rates'
+      fullPath: '/rates'
+      preLoaderRoute: typeof RatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/products': {
       id: '/products'
       path: '/products'
@@ -249,6 +295,20 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ledger': {
+      id: '/ledger'
+      path: '/ledger'
+      fullPath: '/ledger'
+      preLoaderRoute: typeof LedgerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/karigars': {
+      id: '/karigars'
+      path: '/karigars'
+      fullPath: '/karigars'
+      preLoaderRoute: typeof KarigarsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/customers': {
@@ -279,10 +339,13 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BillingRoute: BillingRoute,
   CustomersRoute: CustomersRoute,
+  KarigarsRoute: KarigarsRoute,
+  LedgerRoute: LedgerRoute,
   LoginRoute: LoginRoute,
   OrdersRoute: OrdersRoute,
   ProductTypesRoute: ProductTypesRoute,
   ProductsRoute: ProductsRoute,
+  RatesRoute: RatesRoute,
   ReportsRoute: ReportsRoute,
   RestrictionsRoute: RestrictionsRoute,
   SettingsRoute: SettingsRoute,
@@ -292,12 +355,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
