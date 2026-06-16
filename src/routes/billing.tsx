@@ -1181,6 +1181,7 @@ import { useTableData } from "@/hooks/useTableData";
 import { TableToolbar } from "@/components/TableToolbar";
 import { TablePagination } from "@/components/TablePagination";
 import type { ExportColumn } from "@/lib/exportUtils";
+import { Barcode, QrCode } from "@/components/Barcode";
 
 // Reads the active shop from localStorage and falls back to legacy hardcoded
 // values so existing tenants keep printing correctly until they fill in their
@@ -1490,6 +1491,41 @@ function CusInvoice({
           </tr>
         </tbody>
       </table>
+
+      {/* Verification block: bill QR + HUID barcodes */}
+      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "6mm", fontSize: "11px" }}>
+        <tbody>
+          <tr>
+            <td style={{ width: "30mm", verticalAlign: "top", padding: "2mm" }}>
+              <QrCode
+                size={90}
+                value={JSON.stringify({
+                  bill: bill.billNumber,
+                  amt: finalTotal,
+                  cust: customer?.name || "",
+                  date: bill.createdAt,
+                  gstin: shopProfile?.gstin || shop.gstin,
+                })}
+              />
+              <div style={{ textAlign: "center", marginTop: "1mm", fontSize: "9px" }}>Scan to verify</div>
+            </td>
+            <td style={{ verticalAlign: "top", padding: "2mm" }}>
+              <div style={{ fontWeight: "bold", marginBottom: "2mm", fontSize: "11px" }}>HUID Barcodes</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "4mm" }}>
+                {Array.from(new Set(bill.items.flatMap((i: any) => [
+                  ...parseHuids((i as any).huids),
+                  ...parseHuids((productTypeMap[i.productTypeId] as any)?.huids),
+                ]))).slice(0, 8).map((h) => (
+                  <div key={h} style={{ textAlign: "center" }}>
+                    <Barcode value={String(h)} height={32} width={1.2} fontSize={9} />
+                  </div>
+                ))}
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
 
       <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "18mm", fontSize: "13px" }}>
         <tbody>
