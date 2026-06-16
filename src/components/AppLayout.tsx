@@ -5,23 +5,27 @@ import { useState, useEffect, useCallback } from "react";
 import {
   LayoutDashboard, Package, Layers, Users, ShoppingCart,
   Warehouse, Receipt, FileText, Shield, Bell, Menu, Gem, LogOut,
-  Settings,
+  Settings, TrendingUp, Hammer, BookOpen,
 } from "lucide-react";
 import { alertStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/rates", label: "Rate Board", icon: TrendingUp },
   { to: "/products", label: "Products", icon: Package },
   { to: "/product-types", label: "Product Types", icon: Layers },
   { to: "/customers", label: "Customers", icon: Users },
   { to: "/orders", label: "Orders", icon: ShoppingCart },
   { to: "/stock", label: "Stock", icon: Warehouse },
+  { to: "/karigars", label: "Karigars", icon: Hammer },
   { to: "/billing", label: "Billing", icon: Receipt },
+  { to: "/ledger", label: "Ledger", icon: BookOpen },
   { to: "/reports", label: "Reports", icon: FileText },
   { to: "/restrictions", label: "Restrictions", icon: Shield },
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
+
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
