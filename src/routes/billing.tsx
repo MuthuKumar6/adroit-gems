@@ -1982,12 +1982,15 @@ function BillingPage() {
   /* ── Handlers ── */
   const handleCreate = async () => {
     if (!selectedOrder) return;
-    const disc = Number(discount);
-    const total = Number(selectedOrder.total_amount) - disc;
-    const paid = Number(paidAmount) || total;
+    const disc = Number(discount) || 0;
+    const exchangeGrams = Number(oldGoldGrams) || 0;
+    const exchangeRate = Number(oldGoldRate) || 0;
+    const exchangeValue = +(exchangeGrams * exchangeRate).toFixed(2);
+    const total = +(Number(selectedOrder.total_amount) - disc - exchangeValue).toFixed(2);
+    const paid = paidAmount === "" ? total : Number(paidAmount) || 0;
     const fullyPaid = paid >= total;
 
-    await billStore.add({
+    const createdBill: any = await billStore.add({
       orderId: selectedOrder.id,
       customerId: selectedOrder.customer_id,
       items: selectedOrder.items,
@@ -2010,6 +2013,43 @@ function BillingPage() {
       }
     }
 
+    // ── Post to customer ledger ─────────────────────────────
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const billNo = createdBill?.bill_number || createdBill?.billNumber || "";
+      const ledger = localDb.read<LedgerEntry[]>(LEDGER_KEY, []);
+      const newEntries: LedgerEntry[] = [];
+
+      if (exchangeValue > 0) {
+        newEntries.push({
+          id: newId(),
+          customerId: selectedOrder.customer_id,
+          date: today,
+          type: "exchange",
+          amount: exchangeValue,
+          notes: `Old gold against bill ${billNo}`,
+          oldGoldGrams: exchangeGrams,
+          oldGoldPurity,
+          oldGoldRate: exchangeRate,
+          createdAt: new Date().toISOString(),
+        });
+      }
+      if (paid > 0) {
+        newEntries.push({
+          id: newId(),
+          customerId: selectedOrder.customer_id,
+          date: today,
+          type: "payment",
+          amount: paid,
+          notes: `Payment for bill ${billNo} (${paymentMethod})`,
+          createdAt: new Date().toISOString(),
+        });
+      }
+      if (newEntries.length) localDb.write(LEDGER_KEY, [...newEntries, ...ledger]);
+    } catch (e) {
+      console.warn("Ledger posting failed", e);
+    }
+
     await loadAll();
     qc.invalidateQueries({ queryKey: qk.bills });
     qc.invalidateQueries({ queryKey: qk.orders });
@@ -2017,6 +2057,9 @@ function BillingPage() {
     setSelectedOrderId("");
     setDiscount("0");
     setPaidAmount("");
+    setOldGoldGrams("");
+    setOldGoldRate("");
+    setOldGoldPurity("22K");
   };
 
   const handlePrint = () => {
