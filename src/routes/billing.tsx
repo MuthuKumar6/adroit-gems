@@ -1182,6 +1182,36 @@ import { TableToolbar } from "@/components/TableToolbar";
 import { TablePagination } from "@/components/TablePagination";
 import type { ExportColumn } from "@/lib/exportUtils";
 import { Barcode, QrCode } from "@/components/Barcode";
+import { localDb, newId } from "@/lib/localDb";
+
+// Ledger entry shape — mirrors src/routes/ledger.tsx
+type LedgerEntry = {
+  id: string;
+  customerId: string;
+  date: string;
+  type: "payment" | "exchange" | "advance" | "adjustment";
+  amount: number;
+  notes: string;
+  oldGoldGrams?: number;
+  oldGoldPurity?: string;
+  oldGoldRate?: number;
+  createdAt: string;
+};
+type RateEntry = {
+  id: string; date: string;
+  gold24k: number; gold22k: number; gold18k: number; silver: number;
+};
+const LEDGER_KEY = "ledger_entries";
+const RATES_KEY = "rate_history";
+
+function latestGoldRate(purity: string): number {
+  const list = localDb.read<RateEntry[]>(RATES_KEY, []);
+  if (!list.length) return 0;
+  const e = list[0];
+  if (purity === "24K") return e.gold24k || e.gold22k || 0;
+  if (purity === "18K") return e.gold18k || e.gold22k || 0;
+  return e.gold22k || 0;
+}
 
 // Reads the active shop from localStorage and falls back to legacy hardcoded
 // values so existing tenants keep printing correctly until they fill in their
