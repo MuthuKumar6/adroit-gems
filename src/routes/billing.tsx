@@ -1182,6 +1182,36 @@ import { TableToolbar } from "@/components/TableToolbar";
 import { TablePagination } from "@/components/TablePagination";
 import type { ExportColumn } from "@/lib/exportUtils";
 import { Barcode, QrCode } from "@/components/Barcode";
+import { localDb, newId } from "@/lib/localDb";
+
+// Ledger entry shape — mirrors src/routes/ledger.tsx
+type LedgerEntry = {
+  id: string;
+  customerId: string;
+  date: string;
+  type: "payment" | "exchange" | "advance" | "adjustment";
+  amount: number;
+  notes: string;
+  oldGoldGrams?: number;
+  oldGoldPurity?: string;
+  oldGoldRate?: number;
+  createdAt: string;
+};
+type RateEntry = {
+  id: string; date: string;
+  gold24k: number; gold22k: number; gold18k: number; silver: number;
+};
+const LEDGER_KEY = "ledger_entries";
+const RATES_KEY = "rate_history";
+
+function latestGoldRate(purity: string): number {
+  const list = localDb.read<RateEntry[]>(RATES_KEY, []);
+  if (!list.length) return 0;
+  const e = list[0];
+  if (purity === "24K") return e.gold24k || e.gold22k || 0;
+  if (purity === "18K") return e.gold18k || e.gold22k || 0;
+  return e.gold22k || 0;
+}
 
 // Reads the active shop from localStorage and falls back to legacy hardcoded
 // values so existing tenants keep printing correctly until they fill in their
@@ -1852,6 +1882,10 @@ function BillingPage() {
   const [discount, setDiscount] = useState("0");
   const [paidAmount, setPaidAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<Bill["paymentMethod"]>("cash");
+  // Old gold exchange (deducted from bill total + posted to customer ledger)
+  const [oldGoldGrams, setOldGoldGrams] = useState("");
+  const [oldGoldPurity, setOldGoldPurity] = useState("22K");
+  const [oldGoldRate, setOldGoldRate] = useState("");
 
   /* ── Single loader: fetch everything in parallel, then normalise ── */
   const loadAll = useCallback(async () => {
@@ -1948,12 +1982,15 @@ function BillingPage() {
   /* ── Handlers ── */
   const handleCreate = async () => {
     if (!selectedOrder) return;
-    const disc = Number(discount);
-    const total = Number(selectedOrder.total_amount) - disc;
-    const paid = Number(paidAmount) || total;
+    const disc = Number(discount) || 0;
+    const exchangeGrams = Number(oldGoldGrams) || 0;
+    const exchangeRate = Number(oldGoldRate) || 0;
+    const exchangeValue = +(exchangeGrams * exchangeRate).toFixed(2);
+    const total = +(Number(selectedOrder.total_amount) - disc - exchangeValue).toFixed(2);
+    const paid = paidAmount === "" ? total : Number(paidAmount) || 0;
     const fullyPaid = paid >= total;
 
-    await billStore.add({
+    const createdBill: any = await billStore.add({
       orderId: selectedOrder.id,
       customerId: selectedOrder.customer_id,
       items: selectedOrder.items,
@@ -1976,6 +2013,43 @@ function BillingPage() {
       }
     }
 
+    // ── Post to customer ledger ─────────────────────────────
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const billNo = createdBill?.bill_number || createdBill?.billNumber || "";
+      const ledger = localDb.read<LedgerEntry[]>(LEDGER_KEY, []);
+      const newEntries: LedgerEntry[] = [];
+
+      if (exchangeValue > 0) {
+        newEntries.push({
+          id: newId(),
+          customerId: selectedOrder.customer_id,
+          date: today,
+          type: "exchange",
+          amount: exchangeValue,
+          notes: `Old gold against bill ${billNo}`,
+          oldGoldGrams: exchangeGrams,
+          oldGoldPurity,
+          oldGoldRate: exchangeRate,
+          createdAt: new Date().toISOString(),
+        });
+      }
+      if (paid > 0) {
+        newEntries.push({
+          id: newId(),
+          customerId: selectedOrder.customer_id,
+          date: today,
+          type: "payment",
+          amount: paid,
+          notes: `Payment for bill ${billNo} (${paymentMethod})`,
+          createdAt: new Date().toISOString(),
+        });
+      }
+      if (newEntries.length) localDb.write(LEDGER_KEY, [...newEntries, ...ledger]);
+    } catch (e) {
+      console.warn("Ledger posting failed", e);
+    }
+
     await loadAll();
     qc.invalidateQueries({ queryKey: qk.bills });
     qc.invalidateQueries({ queryKey: qk.orders });
@@ -1983,6 +2057,9 @@ function BillingPage() {
     setSelectedOrderId("");
     setDiscount("0");
     setPaidAmount("");
+    setOldGoldGrams("");
+    setOldGoldRate("");
+    setOldGoldPurity("22K");
   };
 
   const handlePrint = () => {
@@ -2175,7 +2252,10 @@ function BillingPage() {
                   </SelectContent>
                 </Select>
               </div>
-              {selectedOrder && (
+              {selectedOrder && (() => {
+                const exchangeValue = (Number(oldGoldGrams) || 0) * (Number(oldGoldRate) || 0);
+                const netTotal = Number(selectedOrder.total_amount) - Number(discount || 0) - exchangeValue;
+                return (
                 <>
                   <div className="p-3 rounded-lg bg-accent/20 text-sm space-y-1">
                     <div className="flex justify-between">
@@ -2186,9 +2266,15 @@ function BillingPage() {
                       <span className="text-muted-foreground">GST (3%)</span>
                       <span>₹{Number(selectedOrder.gst_amount).toLocaleString("en-IN")}</span>
                     </div>
-                    <div className="flex justify-between font-bold">
-                      <span>Total</span>
-                      <span>₹{Number(selectedOrder.total_amount).toLocaleString("en-IN")}</span>
+                    {exchangeValue > 0 && (
+                      <div className="flex justify-between text-emerald-600">
+                        <span>Old gold exchange</span>
+                        <span>– ₹{exchangeValue.toLocaleString("en-IN")}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-bold border-t border-border pt-1">
+                      <span>Net Total</span>
+                      <span>₹{netTotal.toLocaleString("en-IN")}</span>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
@@ -2202,10 +2288,48 @@ function BillingPage() {
                         type="number"
                         value={paidAmount}
                         onChange={(e) => setPaidAmount(e.target.value)}
-                        placeholder={String(Number(selectedOrder.total_amount) - Number(discount))}
+                        placeholder={String(netTotal)}
                       />
                     </div>
                   </div>
+
+                  {/* Old Gold Exchange */}
+                  <div className="rounded-lg border border-border p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-semibold">Old Gold Exchange (optional)</Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setOldGoldRate(String(latestGoldRate(oldGoldPurity) || ""))}
+                      >
+                        Use today's rate
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="grid gap-1">
+                        <Label className="text-xs">Grams</Label>
+                        <Input type="number" step="0.001" value={oldGoldGrams} onChange={(e) => setOldGoldGrams(e.target.value)} />
+                      </div>
+                      <div className="grid gap-1">
+                        <Label className="text-xs">Purity</Label>
+                        <Select value={oldGoldPurity} onValueChange={(v) => { setOldGoldPurity(v); const r = latestGoldRate(v); if (r) setOldGoldRate(String(r)); }}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="24K">24K</SelectItem>
+                            <SelectItem value="22K">22K</SelectItem>
+                            <SelectItem value="18K">18K</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-1">
+                        <Label className="text-xs">Rate /gm</Label>
+                        <Input type="number" value={oldGoldRate} onChange={(e) => setOldGoldRate(e.target.value)} />
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="grid gap-2">
                     <Label>Payment Method</Label>
                     <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as Bill["paymentMethod"])}>
@@ -2219,7 +2343,8 @@ function BillingPage() {
                     </Select>
                   </div>
                 </>
-              )}
+                );
+              })()}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
