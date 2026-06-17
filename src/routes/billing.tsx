@@ -1882,6 +1882,10 @@ function BillingPage() {
   const [discount, setDiscount] = useState("0");
   const [paidAmount, setPaidAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<Bill["paymentMethod"]>("cash");
+  // Old gold exchange (deducted from bill total + posted to customer ledger)
+  const [oldGoldGrams, setOldGoldGrams] = useState("");
+  const [oldGoldPurity, setOldGoldPurity] = useState("22K");
+  const [oldGoldRate, setOldGoldRate] = useState("");
 
   /* ── Single loader: fetch everything in parallel, then normalise ── */
   const loadAll = useCallback(async () => {
