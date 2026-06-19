@@ -14,11 +14,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, QrCode as QrCodeIcon, Printer } from "lucide-react";
 import { useTableData } from "@/hooks/useTableData";
 import { TableToolbar } from "@/components/TableToolbar";
 import { TablePagination } from "@/components/TablePagination";
 import type { ExportColumn } from "@/lib/exportUtils";
+import { Barcode, QrCode } from "@/components/Barcode";
 
 export const Route = createFileRoute("/product-types")({
   component: ProductTypesPage,
@@ -85,6 +86,7 @@ function ProductTypesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ProductType | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [tagsFor, setTagsFor] = useState<ProductType | null>(null);
 
   const fetchData = async () => {
     try {
@@ -343,6 +345,9 @@ function ProductTypesPage() {
 
                         {/* Actions */}
                         <TableCell className="text-right space-x-1">
+                          <Button variant="ghost" size="icon" onClick={() => setTagsFor(pt)} title="Print tags / QR">
+                            <QrCodeIcon className="h-4 w-4" />
+                          </Button>
                           <Button variant="ghost" size="icon" onClick={() => openEdit(pt)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -554,6 +559,48 @@ function ProductTypesPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* QR / Barcode Tags Dialog */}
+        <Dialog open={!!tagsFor} onOpenChange={(o) => !o && setTagsFor(null)}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center justify-between">
+                <span>Tags — {tagsFor?.name}</span>
+                <Button size="sm" variant="outline" onClick={() => window.print()}>
+                  <Printer className="h-4 w-4 mr-2" /> Print
+                </Button>
+              </DialogTitle>
+            </DialogHeader>
+            {tagsFor && (
+              <div id="print-tags" className="grid grid-cols-2 md:grid-cols-3 gap-3 py-2">
+                {(() => {
+                  const huids = toArray(tagsFor.huids);
+                  const subs = toArray(tagsFor.sub_names);
+                  const codes = huids.length > 0 ? huids : (subs.length > 0 ? subs : [tagsFor.tag_no || tagsFor.id]);
+                  return codes.map((code, i) => {
+                    const payload = JSON.stringify({
+                      h: code,
+                      n: tagsFor.name,
+                      m: `${tagsFor.productName || ''} ${tagsFor.purity || ''}`.trim(),
+                      w: tagsFor.net_weight,
+                    });
+                    return (
+                      <div key={`${code}-${i}`} className="border border-border rounded-md p-3 flex flex-col items-center gap-2 bg-card">
+                        <div className="text-[11px] font-semibold text-center">{tagsFor.name}</div>
+                        <div className="text-[10px] text-muted-foreground text-center">
+                          {tagsFor.productName} {tagsFor.purity} · {tagsFor.net_weight}g
+                        </div>
+                        <QrCode value={payload} size={90} />
+                        <Barcode value={code} height={36} width={1.3} fontSize={10} />
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
 
       </div>
     </AppLayout>
