@@ -14,12 +14,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Pencil, Trash2, Loader2, QrCode as QrCodeIcon, Printer } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, QrCode as QrCodeIcon, Printer, FileDown, ImageDown } from "lucide-react";
 import { useTableData } from "@/hooks/useTableData";
 import { TableToolbar } from "@/components/TableToolbar";
 import { TablePagination } from "@/components/TablePagination";
 import type { ExportColumn } from "@/lib/exportUtils";
 import { Barcode, QrCode } from "@/components/Barcode";
+import { downloadTagPng, downloadTagsPdf, type TagInfo } from "@/lib/tagExport";
 
 export const Route = createFileRoute("/product-types")({
   component: ProductTypesPage,
@@ -564,11 +565,32 @@ function ProductTypesPage() {
         <Dialog open={!!tagsFor} onOpenChange={(o) => !o && setTagsFor(null)}>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="flex items-center justify-between">
+              <DialogTitle className="flex items-center justify-between flex-wrap gap-2">
                 <span>Tags — {tagsFor?.name}</span>
-                <Button size="sm" variant="outline" onClick={() => window.print()}>
-                  <Printer className="h-4 w-4 mr-2" /> Print
-                </Button>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => window.print()}>
+                    <Printer className="h-4 w-4 mr-2" /> Print
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      if (!tagsFor) return;
+                      const huids = toArray(tagsFor.huids);
+                      const subs = toArray(tagsFor.sub_names);
+                      const codes = huids.length > 0 ? huids : (subs.length > 0 ? subs : [tagsFor.tag_no || tagsFor.id]);
+                      const tags: TagInfo[] = codes.map((code) => ({
+                        code,
+                        title: tagsFor.name,
+                        subtitle: `${tagsFor.productName || ''} ${tagsFor.purity || ''} · ${tagsFor.net_weight}g`.trim(),
+                        payload: JSON.stringify({ h: code, n: tagsFor.name, m: `${tagsFor.productName || ''} ${tagsFor.purity || ''}`.trim(), w: tagsFor.net_weight }),
+                      }));
+                      await downloadTagsPdf(tags, `tags_${tagsFor.tag_no || tagsFor.name}`);
+                    }}
+                  >
+                    <FileDown className="h-4 w-4 mr-2" /> Download PDF
+                  </Button>
+                </div>
               </DialogTitle>
             </DialogHeader>
             {tagsFor && (
@@ -592,6 +614,47 @@ function ProductTypesPage() {
                         </div>
                         <QrCode value={payload} size={90} />
                         <Barcode value={code} height={36} width={1.3} fontSize={10} />
+                        <div className="text-[10px] font-mono break-all text-center">{code}</div>
+                        <div className="flex gap-1 w-full print:hidden">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1 h-7 text-[10px]"
+                            onClick={() =>
+                              downloadTagPng(
+                                {
+                                  code,
+                                  title: tagsFor.name,
+                                  subtitle: `${tagsFor.productName || ''} ${tagsFor.purity || ''} · ${tagsFor.net_weight}g`.trim(),
+                                  payload,
+                                },
+                                `tag_${code}`,
+                              )
+                            }
+                          >
+                            <ImageDown className="h-3 w-3 mr-1" /> PNG
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1 h-7 text-[10px]"
+                            onClick={() =>
+                              downloadTagsPdf(
+                                [
+                                  {
+                                    code,
+                                    title: tagsFor.name,
+                                    subtitle: `${tagsFor.productName || ''} ${tagsFor.purity || ''} · ${tagsFor.net_weight}g`.trim(),
+                                    payload,
+                                  },
+                                ],
+                                `tag_${code}`,
+                              )
+                            }
+                          >
+                            <FileDown className="h-3 w-3 mr-1" /> PDF
+                          </Button>
+                        </div>
                       </div>
                     );
                   });
