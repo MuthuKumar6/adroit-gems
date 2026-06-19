@@ -345,6 +345,9 @@ function ProductTypesPage() {
 
                         {/* Actions */}
                         <TableCell className="text-right space-x-1">
+                          <Button variant="ghost" size="icon" onClick={() => setTagsFor(pt)} title="Print tags / QR">
+                            <QrCodeIcon className="h-4 w-4" />
+                          </Button>
                           <Button variant="ghost" size="icon" onClick={() => openEdit(pt)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
