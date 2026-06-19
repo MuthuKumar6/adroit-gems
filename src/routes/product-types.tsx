@@ -86,6 +86,7 @@ function ProductTypesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<ProductType | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [tagsFor, setTagsFor] = useState<ProductType | null>(null);
 
   const fetchData = async () => {
     try {
