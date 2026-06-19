@@ -14,11 +14,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, QrCode as QrCodeIcon, Printer } from "lucide-react";
 import { useTableData } from "@/hooks/useTableData";
 import { TableToolbar } from "@/components/TableToolbar";
 import { TablePagination } from "@/components/TablePagination";
 import type { ExportColumn } from "@/lib/exportUtils";
+import { Barcode, QrCode } from "@/components/Barcode";
 
 export const Route = createFileRoute("/product-types")({
   component: ProductTypesPage,
