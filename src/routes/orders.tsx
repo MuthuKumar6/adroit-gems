@@ -228,6 +228,7 @@ function OrdersPage() {
         const making = pt.making_charge_type === 'per_gram'
           ? (pt.making_charges || 0) * weight
           : (pt.making_charges || 0) * oi.quantity;
+          
         const amount = (weight * rate) + making;
 
         if (amount <= 0) {
