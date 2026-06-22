@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Gem, AlertTriangle, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/signup")({
   component: SignupPage,
@@ -43,14 +44,16 @@ function SignupPage() {
         localStorage.setItem("token", res.token);
         localStorage.setItem("currentShop", JSON.stringify(res.shop));
 
-        alert("Shop created successfully! 🎉");
+        toast.success("Shop created successfully! 🎉");
         navigate({ to: "/" });   // Change to your dashboard route
       } else {
         setError(res.error || "Signup failed. Please try again.");
+        toast.error("Failed to create shop. Please try again.");
       }
     } catch (err: any) {
       console.error("Signup Error:", err);
       setError("Cannot connect to server. Make sure backend is running on port 5000.");
+      toast.error("Cannot connect to server.");
     } finally {
       setLoading(false);
     }

@@ -143,29 +143,31 @@ function OrdersPage() {
 
   const handleCreate = async () => {
     if (!customerId || orderItems.length === 0) {
-      alert("Please select customer and add at least one item");
+      toast.error("Please select a customer and add at least one item");
+      // alert("Please select customer and add at least one item");
       return;
     }
 
     // Customer must belong to this shop's loaded list
     if (!customers.find(c => c.id === customerId)) {
-      alert("Selected customer is not valid for this shop");
+      toast.error("Selected customer is not valid for this shop");
+      // alert("Selected customer is not valid for this shop");
       return;
     }
 
     // Per-item structural validation
     for (const oi of orderItems) {
       if (!oi.productTypeId) {
-        alert("Every item must have a product selected");
+        toast.error("Every item must have a product selected");
         return;
       }
       if (!productTypes.find(p => p.id === oi.productTypeId)) {
-        alert("One of the selected products is not valid for this shop");
+        toast.error("One of the selected products is not valid for this shop");
         return;
       }
       const qty = Number(oi.quantity);
       if (!Number.isFinite(qty) || qty <= 0 || !Number.isInteger(qty)) {
-        alert(`Quantity must be a positive whole number (got "${oi.quantity}")`);
+        toast.error(`Quantity must be a positive whole number (got "${oi.quantity}")`);
         return;
       }
     }
@@ -217,7 +219,7 @@ function OrdersPage() {
         const rate = Number(product?.current_rate || 0);
 
         if (rate <= 0) {
-          setLimitWarning(`Rate for ${pt.name} is not set — update the product rate before ordering`);
+          toast.error(`Rate for ${pt.name} is not set — update the product rate before ordering`);
           return;
         }
         if (weight <= 0) {

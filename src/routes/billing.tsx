@@ -1217,7 +1217,8 @@ function latestGoldRate(purity: string): number {
 // values so existing tenants keep printing correctly until they fill in their
 // own shop profile (gstin / phone / address).
 function getShopHeader() {
-  const shop = auth.getCurrentShop() || {};
+  // const shop = auth.getCurrentShop() || {};
+  const shop = auth.getShop() || {};
   return {
     name: shop.shopName || shop.name || "Sridhar Jewellers",
     gstin: shop.gstin || "33BNFPS1282R1ZE",
@@ -2256,93 +2257,93 @@ function BillingPage() {
                 const exchangeValue = (Number(oldGoldGrams) || 0) * (Number(oldGoldRate) || 0);
                 const netTotal = Number(selectedOrder.total_amount) - Number(discount || 0) - exchangeValue;
                 return (
-                <>
-                  <div className="p-3 rounded-lg bg-accent/20 text-sm space-y-1">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Subtotal</span>
-                      <span>₹{Number(selectedOrder.subtotal).toLocaleString("en-IN")}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">GST (3%)</span>
-                      <span>₹{Number(selectedOrder.gst_amount).toLocaleString("en-IN")}</span>
-                    </div>
-                    {exchangeValue > 0 && (
-                      <div className="flex justify-between text-emerald-600">
-                        <span>Old gold exchange</span>
-                        <span>– ₹{exchangeValue.toLocaleString("en-IN")}</span>
+                  <>
+                    <div className="p-3 rounded-lg bg-accent/20 text-sm space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Subtotal</span>
+                        <span>₹{Number(selectedOrder.subtotal).toLocaleString("en-IN")}</span>
                       </div>
-                    )}
-                    <div className="flex justify-between font-bold border-t border-border pt-1">
-                      <span>Net Total</span>
-                      <span>₹{netTotal.toLocaleString("en-IN")}</span>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">GST (3%)</span>
+                        <span>₹{Number(selectedOrder.gst_amount).toLocaleString("en-IN")}</span>
+                      </div>
+                      {exchangeValue > 0 && (
+                        <div className="flex justify-between text-emerald-600">
+                          <span>Old gold exchange</span>
+                          <span>– ₹{exchangeValue.toLocaleString("en-IN")}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between font-bold border-t border-border pt-1">
+                        <span>Net Total</span>
+                        <span>₹{netTotal.toLocaleString("en-IN")}</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label>Discount (₹)</Label>
-                      <Input type="number" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label>Discount (₹)</Label>
+                        <Input type="number" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>Paid Amount (₹)</Label>
+                        <Input
+                          type="number"
+                          value={paidAmount}
+                          onChange={(e) => setPaidAmount(e.target.value)}
+                          placeholder={String(netTotal)}
+                        />
+                      </div>
                     </div>
-                    <div className="grid gap-2">
-                      <Label>Paid Amount (₹)</Label>
-                      <Input
-                        type="number"
-                        value={paidAmount}
-                        onChange={(e) => setPaidAmount(e.target.value)}
-                        placeholder={String(netTotal)}
-                      />
-                    </div>
-                  </div>
 
-                  {/* Old Gold Exchange */}
-                  <div className="rounded-lg border border-border p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-semibold">Old Gold Exchange (optional)</Label>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-xs"
-                        onClick={() => setOldGoldRate(String(latestGoldRate(oldGoldPurity) || ""))}
-                      >
-                        Use today's rate
-                      </Button>
+                    {/* Old Gold Exchange */}
+                    <div className="rounded-lg border border-border p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-semibold">Old Gold Exchange (optional)</Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => setOldGoldRate(String(latestGoldRate(oldGoldPurity) || ""))}
+                        >
+                          Use today's rate
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="grid gap-1">
+                          <Label className="text-xs">Grams</Label>
+                          <Input type="number" step="0.001" value={oldGoldGrams} onChange={(e) => setOldGoldGrams(e.target.value)} />
+                        </div>
+                        <div className="grid gap-1">
+                          <Label className="text-xs">Purity</Label>
+                          <Select value={oldGoldPurity} onValueChange={(v) => { setOldGoldPurity(v); const r = latestGoldRate(v); if (r) setOldGoldRate(String(r)); }}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="24K">24K</SelectItem>
+                              <SelectItem value="22K">22K</SelectItem>
+                              <SelectItem value="18K">18K</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-1">
+                          <Label className="text-xs">Rate /gm</Label>
+                          <Input type="number" value={oldGoldRate} onChange={(e) => setOldGoldRate(e.target.value)} />
+                        </div>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="grid gap-1">
-                        <Label className="text-xs">Grams</Label>
-                        <Input type="number" step="0.001" value={oldGoldGrams} onChange={(e) => setOldGoldGrams(e.target.value)} />
-                      </div>
-                      <div className="grid gap-1">
-                        <Label className="text-xs">Purity</Label>
-                        <Select value={oldGoldPurity} onValueChange={(v) => { setOldGoldPurity(v); const r = latestGoldRate(v); if (r) setOldGoldRate(String(r)); }}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="24K">24K</SelectItem>
-                            <SelectItem value="22K">22K</SelectItem>
-                            <SelectItem value="18K">18K</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="grid gap-1">
-                        <Label className="text-xs">Rate /gm</Label>
-                        <Input type="number" value={oldGoldRate} onChange={(e) => setOldGoldRate(e.target.value)} />
-                      </div>
-                    </div>
-                  </div>
 
-                  <div className="grid gap-2">
-                    <Label>Payment Method</Label>
-                    <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as Bill["paymentMethod"])}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="cash">Cash</SelectItem>
-                        <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                        <SelectItem value="cheque">Cheque</SelectItem>
-                        <SelectItem value="upi">UPI</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </>
+                    <div className="grid gap-2">
+                      <Label>Payment Method</Label>
+                      <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as Bill["paymentMethod"])}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="cash">Cash</SelectItem>
+                          <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                          <SelectItem value="cheque">Cheque</SelectItem>
+                          <SelectItem value="upi">UPI</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
                 );
               })()}
             </div>

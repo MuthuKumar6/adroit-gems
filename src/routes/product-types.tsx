@@ -21,6 +21,7 @@ import { TablePagination } from "@/components/TablePagination";
 import type { ExportColumn } from "@/lib/exportUtils";
 import { Barcode, QrCode } from "@/components/Barcode";
 import { downloadTagPng, downloadTagsPdf, type TagInfo } from "@/lib/tagExport";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/product-types")({
   component: ProductTypesPage,
@@ -142,7 +143,7 @@ function ProductTypesPage() {
 
   const handleSave = async () => {
     if (!form.product_id || !form.name.trim()) {
-      alert("Base Metal and Type Name are required");
+      toast.error("Base Metal and Type Name are required");
       return;
     }
 
@@ -182,7 +183,7 @@ function ProductTypesPage() {
       setDialogOpen(false);
     } catch (err) {
       console.error(err);
-      alert("Failed to save product type");
+      toast.error("Failed to save product type");
     } finally {
       setSaving(false);
     }
@@ -195,7 +196,7 @@ function ProductTypesPage() {
       await fetchData();
     } catch (err) {
       console.error(err);
-      alert("Failed to delete product type");
+      toast.error("Failed to delete product type");
     }
   };
 
