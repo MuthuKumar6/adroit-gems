@@ -147,10 +147,8 @@ function SettingsPage() {
       // Guard: only hydrate form when the response is OK *and* data is a
       // non-null object.  A 404 (new shop, no profile yet) returns res.ok =
       // false or res.data = undefined — both are safe to ignore here.
-      console.log('Shop profile response:', res);
       if (res.ok && res.data && typeof res.data === 'object') {
         const d = res.data;
-        console.log('Shop profile data:', d);
         setForm({
           shopName:  d.shop_name  || '',
           ownerName: d.owner_name || '',
