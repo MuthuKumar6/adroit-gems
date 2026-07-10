@@ -1,3 +1,4 @@
+
 // // src/routes/billing.tsx
 // import { createFileRoute } from "@tanstack/react-router";
 // import { AppLayout } from "@/components/AppLayout";
@@ -29,12 +30,44 @@
 // import { TableToolbar } from "@/components/TableToolbar";
 // import { TablePagination } from "@/components/TablePagination";
 // import type { ExportColumn } from "@/lib/exportUtils";
+// import { Barcode, QrCode } from "@/components/Barcode";
+// import { localDb, newId } from "@/lib/localDb";
+
+// // Ledger entry shape — mirrors src/routes/ledger.tsx
+// type LedgerEntry = {
+//   id: string;
+//   customerId: string;
+//   date: string;
+//   type: "payment" | "exchange" | "advance" | "adjustment";
+//   amount: number;
+//   notes: string;
+//   oldGoldGrams?: number;
+//   oldGoldPurity?: string;
+//   oldGoldRate?: number;
+//   createdAt: string;
+// };
+// type RateEntry = {
+//   id: string; date: string;
+//   gold24k: number; gold22k: number; gold18k: number; silver: number;
+// };
+// const LEDGER_KEY = "ledger_entries";
+// const RATES_KEY = "rate_history";
+
+// function latestGoldRate(purity: string): number {
+//   const list = localDb.read<RateEntry[]>(RATES_KEY, []);
+//   if (!list.length) return 0;
+//   const e = list[0];
+//   if (purity === "24K") return e.gold24k || e.gold22k || 0;
+//   if (purity === "18K") return e.gold18k || e.gold22k || 0;
+//   return e.gold22k || 0;
+// }
 
 // // Reads the active shop from localStorage and falls back to legacy hardcoded
 // // values so existing tenants keep printing correctly until they fill in their
 // // own shop profile (gstin / phone / address).
 // function getShopHeader() {
-//   const shop = auth.getCurrentShop() || {};
+//   // const shop = auth.getCurrentShop() || {};
+//   const shop = auth.getShop() || {};
 //   return {
 //     name: shop.shopName || shop.name || "Sridhar Jewellers",
 //     gstin: shop.gstin || "33BNFPS1282R1ZE",
@@ -42,8 +75,6 @@
 //     address: shop.address || "215, Swamy Viveganandar Salai, Ramanadhapuram – 623503",
 //   };
 // }
-
-
 
 // export const Route = createFileRoute("/billing")({
 //   component: BillingPage,
@@ -70,6 +101,14 @@
 //   return convert(num) + " Only";
 // }
 
+// function parseHuids(huids: any): string[] {
+//   if (Array.isArray(huids)) return huids;
+//   if (typeof huids === "string") {
+//     try { return JSON.parse(huids); } catch { return [huids]; }
+//   }
+//   return [];
+// }
+
 // /* ─── lookup map types ─────────────────────────────────── */
 // type CustomerMap = Record<string, Customer>;
 // type ProductTypeMap = Record<string, ProductType>;
@@ -83,7 +122,6 @@
 //   // items live on the order, not the bill row
 //   const items = (order?.items ?? b.items ?? []).map((item: any) => ({
 //     ...item,
-//     // alias snake_case item fields to camelCase
 //     id: item.id,
 //     productTypeId: item.product_type_id ?? item.productTypeId ?? "",
 //     quantity: Number(item.quantity ?? 0),
@@ -95,7 +133,6 @@
 
 //   return {
 //     ...b,
-//     // camelCase aliases expected by invoice components
 //     billNumber: b.bill_number ?? b.billNumber ?? "",
 //     orderId,
 //     customerId: b.customer_id ?? b.customerId ?? "",
@@ -118,12 +155,12 @@
 //   bill,
 //   customerMap,
 //   productTypeMap,
-//   shopProfile
+//   shopProfile,
 // }: {
 //   bill: Bill;
 //   customerMap: CustomerMap;
 //   productTypeMap: ProductTypeMap;
-//   shopProfile: {             // ← add this
+//   shopProfile: {
 //     shop_name: string;
 //     gstin: string;
 //     phone: string;
@@ -140,18 +177,19 @@
 //   const roundOff = +(Math.round(bill.totalAmount) - bill.totalAmount).toFixed(2);
 //   const finalTotal = Math.round(bill.totalAmount);
 
-//   // Derive gold/silver rate from this bill's items (rate_per_gram on the order item).
+
+
 //   const rateFor = (metalKeyword: string) => {
 //     const it = bill.items.find((i: any) => {
 //       const pt = productTypeMap[i.productTypeId];
-//       const metal = (pt as any)?.metal || (pt as any)?.product_name || pt?.name || '';
+//       const metal = (pt as any)?.metal || (pt as any)?.product_name || pt?.name || "";
 //       return String(metal).toLowerCase().includes(metalKeyword);
 //     });
 //     const rate = (it as any)?.ratePerGram ?? (it as any)?.rate_per_gram;
-//     return rate ? `₹${Number(rate).toLocaleString('en-IN')}` : '—';
+//     return rate ? `₹${Number(rate).toLocaleString("en-IN")}` : "—";
 //   };
-//   const goldRate = rateFor('gold');
-//   const silverRate = rateFor('silver');
+//   const goldRate = rateFor("gold");
+//   const silverRate = rateFor("silver");
 
 //   const td = (extra?: React.CSSProperties): React.CSSProperties => ({
 //     padding: "8px 10px",
@@ -159,13 +197,7 @@
 //     ...extra,
 //   });
 
-//   function parseHuids(huids: any): string[] {
-//     if (Array.isArray(huids)) return huids;
-//     if (typeof huids === "string") {
-//       try { return JSON.parse(huids); } catch { return [huids]; }
-//     }
-//     return [];
-//   }
+//   console.log("CusInvoice render", { bill, customer, shopProfile, productTypeMap });
 
 //   return (
 //     <div
@@ -188,10 +220,10 @@
 //         <tbody>
 //           <tr>
 //             <td style={{ fontSize: "12px", paddingBottom: "1mm" }}>
-//               GSTIN : <strong>{shopProfile.gstin || shop.gstin}</strong>
+//               GSTIN : <strong>{shopProfile?.gstin || shop.gstin}</strong>
 //             </td>
 //             <td style={{ textAlign: "right", fontSize: "12px", paddingBottom: "1mm" }}>
-//               Phone : <strong>{shopProfile.phone || shop.phone}</strong>
+//               Phone : <strong>{shopProfile?.phone || shop.phone}</strong>
 //             </td>
 //           </tr>
 //         </tbody>
@@ -199,10 +231,10 @@
 
 //       <div style={{ textAlign: "center", borderTop: "3px double #000", borderBottom: "3px double #000", padding: "4mm 0", marginBottom: "4mm" }}>
 //         <div style={{ fontSize: "28px", fontWeight: "bold", letterSpacing: "4px", textTransform: "uppercase" }}>
-//           {shopProfile.shop_name || shop.name}
+//           {shopProfile?.shop_name || shop.name}
 //         </div>
 //         <div style={{ fontSize: "13px", marginTop: "2mm" }}>
-//           {shopProfile.address || shop.address}
+//           {shopProfile?.address || shop.address}
 //         </div>
 //       </div>
 
@@ -270,10 +302,12 @@
 //               <tr key={item.id} style={{ background: idx % 2 === 0 ? "#fff" : "#fafafa" }}>
 //                 <td style={{ padding: "9px 10px", textAlign: "center", border: "1px solid #ddd" }}>{idx + 1}</td>
 //                 <td style={{ padding: "9px 10px", border: "1px solid #ddd" }}>{pt?.name || item.productTypeId}</td>
-//                 <td style={{ padding: "9px 10px", textAlign: "center", border: "1px solid #ddd" }}>{parseHuids((item as any).huids).join(", ") || parseHuids(pt?.huids).join(", ")}</td>
+//                 <td style={{ padding: "9px 10px", textAlign: "center", border: "1px solid #ddd" }}>
+//                   {parseHuids((item as any).huids).join(", ") || parseHuids((pt as any)?.huids).join(", ")}
+//                 </td>
 //                 <td style={{ padding: "9px 10px", textAlign: "center", border: "1px solid #ddd" }}>{item.quantity}</td>
 //                 <td style={{ padding: "9px 10px", textAlign: "right", border: "1px solid #ddd" }}>{item.weightGrams}</td>
-//                 <td style={{ padding: "9px 10px", textAlign: "right", border: "1px solid #ddd" }}>{pt?.wastage_percentage}</td>
+//                 <td style={{ padding: "9px 10px", textAlign: "right", border: "1px solid #ddd" }}>{(pt as any)?.wastage_percentage}</td>
 //                 <td style={{ padding: "9px 10px", textAlign: "right", border: "1px solid #ddd" }}>{item.makingCharges}</td>
 //                 <td style={{ padding: "9px 10px", textAlign: "right", border: "1px solid #ddd", fontWeight: "500" }}>
 //                   ₹{(item.amount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
@@ -342,6 +376,41 @@
 //         </tbody>
 //       </table>
 
+//       {/* Verification block: bill QR + HUID barcodes */}
+//       <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "6mm", fontSize: "11px" }}>
+//         <tbody>
+//           <tr>
+//             <td style={{ width: "30mm", verticalAlign: "top", padding: "2mm" }}>
+//               <QrCode
+//                 size={90}
+//                 value={JSON.stringify({
+//                   bill: bill.billNumber,
+//                   amt: finalTotal,
+//                   cust: customer?.name || "",
+//                   date: bill.createdAt,
+//                   gstin: shopProfile?.gstin || shop.gstin,
+//                 })}
+//               />
+//               <div style={{ textAlign: "center", marginTop: "1mm", fontSize: "9px" }}>Scan to verify</div>
+//             </td>
+//             <td style={{ verticalAlign: "top", padding: "2mm" }}>
+//               <div style={{ fontWeight: "bold", marginBottom: "2mm", fontSize: "11px" }}>HUID Barcodes</div>
+//               <div style={{ display: "flex", flexWrap: "wrap", gap: "4mm" }}>
+//                 {Array.from(new Set(bill.items.flatMap((i: any) => [
+//                   ...parseHuids((i as any).huids),
+//                   ...parseHuids((productTypeMap[i.productTypeId] as any)?.huids),
+//                 ]))).slice(0, 8).map((h) => (
+//                   <div key={h} style={{ textAlign: "center" }}>
+//                     <Barcode value={String(h)} height={32} width={1.2} fontSize={9} />
+//                   </div>
+//                 ))}
+//               </div>
+//             </td>
+//           </tr>
+//         </tbody>
+//       </table>
+
+
 //       <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "18mm", fontSize: "13px" }}>
 //         <tbody>
 //           <tr>
@@ -364,7 +433,9 @@
 // const VYB_ROWS_OTHER = 28;
 // const VYB_ROWS_LAST_MIN = 6;
 
-// function VyabariShopHeader({ bill, customer, page, totalPages, goldRate, silverRate }: {
+// function VyabariShopHeader({
+//   bill, customer, page, totalPages, goldRate, silverRate,
+// }: {
 //   bill: Bill; customer: Customer | undefined; page: number; totalPages: number; goldRate: string; silverRate: string;
 // }) {
 //   const shop = getShopHeader();
@@ -429,12 +500,12 @@
 // function VyabariInvoice({
 //   bill,
 //   customerMap,
-//   productTypeMap
+//   productTypeMap,
 // }: {
 //   bill: Bill;
 //   customerMap: CustomerMap;
 //   productTypeMap: ProductTypeMap;
-//   shopProfile: {             // ← add this
+//   shopProfile: {
 //     shop_name: string;
 //     gstin: string;
 //     phone: string;
@@ -453,14 +524,14 @@
 //   const rateFor = (metalKeyword: string) => {
 //     const it = bill.items.find((i: any) => {
 //       const pt = productTypeMap[i.productTypeId];
-//       const metal = (pt as any)?.metal || (pt as any)?.product_name || pt?.name || '';
+//       const metal = (pt as any)?.metal || (pt as any)?.product_name || pt?.name || "";
 //       return String(metal).toLowerCase().includes(metalKeyword);
 //     });
 //     const rate = (it as any)?.ratePerGram ?? (it as any)?.rate_per_gram;
-//     return rate ? `₹${Number(rate).toLocaleString('en-IN')}` : '—';
+//     return rate ? `₹${Number(rate).toLocaleString("en-IN")}` : "—";
 //   };
-//   const goldRate = rateFor('gold');
-//   const silverRate = rateFor('silver');
+//   const goldRate = rateFor("gold");
+//   const silverRate = rateFor("silver");
 
 //   const allItems = bill.items;
 //   const chunks: typeof allItems[] = [];
@@ -485,17 +556,14 @@
 //   });
 
 //   const thStyle = (align: "center" | "left" | "right"): React.CSSProperties => ({
-//     padding: "6px 8px", textAlign: align, fontWeight: "bold",
-//     border: "1px solid #000", whiteSpace: "nowrap", fontSize: "11.5px", background: "#f0f0f0",
+//     padding: "6px 8px",
+//     textAlign: align,
+//     fontWeight: "bold",
+//     border: "1px solid #000",
+//     whiteSpace: "nowrap",
+//     fontSize: "11.5px",
+//     background: "#f0f0f0",
 //   });
-
-//   function parseHuids(huids: any): string[] {
-//     if (Array.isArray(huids)) return huids;
-//     if (typeof huids === "string") {
-//       try { return JSON.parse(huids); } catch { return [huids]; }
-//     }
-//     return [];
-//   }
 
 //   return (
 //     <div id="vyb-invoice-print" style={{ fontFamily: "'Times New Roman', Times, serif", color: "#000", background: "#fff" }}>
@@ -506,8 +574,27 @@
 //         const fillerCount = isLast ? Math.max(0, 8 - pageItems.length) : 0;
 
 //         return (
-//           <div key={pIdx} style={{ width: "210mm", minHeight: "297mm", padding: "12mm 15mm 10mm", boxSizing: "border-box", display: "flex", flexDirection: "column", pageBreakAfter: isLast ? "auto" : "always", breakAfter: isLast ? "auto" : "page" }}>
-//             <VyabariShopHeader bill={bill} customer={customer} page={pageNum} totalPages={totalPages} goldRate={goldRate} silverRate={silverRate} />
+//           <div
+//             key={pIdx}
+//             style={{
+//               width: "210mm",
+//               minHeight: "297mm",
+//               padding: "12mm 15mm 10mm",
+//               boxSizing: "border-box",
+//               display: "flex",
+//               flexDirection: "column",
+//               pageBreakAfter: isLast ? "auto" : "always",
+//               breakAfter: isLast ? "auto" : "page",
+//             }}
+//           >
+//             <VyabariShopHeader
+//               bill={bill}
+//               customer={customer}
+//               page={pageNum}
+//               totalPages={totalPages}
+//               goldRate={goldRate}
+//               silverRate={silverRate}
+//             />
 //             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", flexGrow: isLast ? 0 : 1 }}>
 //               <thead>
 //                 <tr>
@@ -526,7 +613,9 @@
 //                     <tr key={item.id} style={{ background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
 //                       <td style={{ padding: "7px 8px", textAlign: "center", border: "1px solid #ddd" }}>{startNo + i}</td>
 //                       <td style={{ padding: "7px 8px", border: "1px solid #ddd" }}>{pt?.name || item.productTypeId}</td>
-//                       <td style={{ padding: "7px 8px", textAlign: "center", border: "1px solid #ddd" }}>{parseHuids((item as any).huids).join(", ") || parseHuids(pt?.huids).join(", ")}</td>
+//                       <td style={{ padding: "7px 8px", textAlign: "center", border: "1px solid #ddd" }}>
+//                         {parseHuids((item as any).huids).join(", ") || parseHuids((pt as any)?.huids).join(", ")}
+//                       </td>
 //                       <td style={{ padding: "7px 8px", textAlign: "center", border: "1px solid #ddd" }}>{item.quantity}</td>
 //                       <td style={{ padding: "7px 8px", textAlign: "right", border: "1px solid #ddd" }}>{item.weightGrams}</td>
 //                       <td style={{ padding: "7px 8px", textAlign: "right", border: "1px solid #ddd", fontWeight: "500" }}>
@@ -546,7 +635,9 @@
 //               <tfoot>
 //                 {!isLast ? (
 //                   <tr style={{ background: "#f0f0f0", fontWeight: "bold" }}>
-//                     <td colSpan={4} style={{ padding: "6px 8px", border: "1px solid #000", fontStyle: "italic", fontSize: "11px" }}>Subtotal carried forward…</td>
+//                     <td colSpan={4} style={{ padding: "6px 8px", border: "1px solid #000", fontStyle: "italic", fontSize: "11px" }}>
+//                       Subtotal carried forward…
+//                     </td>
 //                     <td style={{ padding: "6px 8px", border: "1px solid #000" }}></td>
 //                     <td style={{ padding: "6px 8px", textAlign: "right", border: "1px solid #000" }}>
 //                       {runningSubtotals[pIdx].toLocaleString("en-IN", { minimumFractionDigits: 2 })}
@@ -579,7 +670,8 @@
 //                     {bill.discount > 0 && (
 //                       <tr>
 //                         <td style={{ padding: "5px 8px" }}>Discount : ₹{bill.discount.toLocaleString("en-IN")}</td>
-//                         <td></td><td></td>
+//                         <td></td>
+//                         <td></td>
 //                       </tr>
 //                     )}
 //                     <tr>
@@ -640,11 +732,14 @@
 //   const printRef = useRef<HTMLDivElement>(null);
 //   const [shopProfile, setShopProfile] = useState<any>(null);
 
-
 //   const [selectedOrderId, setSelectedOrderId] = useState("");
 //   const [discount, setDiscount] = useState("0");
 //   const [paidAmount, setPaidAmount] = useState("");
 //   const [paymentMethod, setPaymentMethod] = useState<Bill["paymentMethod"]>("cash");
+//   // Old gold exchange (deducted from bill total + posted to customer ledger)
+//   const [oldGoldGrams, setOldGoldGrams] = useState("");
+//   const [oldGoldPurity, setOldGoldPurity] = useState("22K");
+//   const [oldGoldRate, setOldGoldRate] = useState("");
 
 //   /* ── Single loader: fetch everything in parallel, then normalise ── */
 //   const loadAll = useCallback(async () => {
@@ -657,12 +752,10 @@
 
 //     const rawOrders: Order[] = Array.isArray(ordersRes) ? ordersRes : [];
 
-//     // Build order map first so normaliseBill can attach items
 //     const oMap: OrderMap = {};
 //     rawOrders.forEach((o: Order) => { oMap[o.id] = o; });
 //     setOrderMap(oMap);
 
-//     // Normalise bills: snake_case → camelCase + attach items from order
 //     const normalisedBills: Bill[] = (Array.isArray(billsRes) ? billsRes : []).map(
 //       (b: any) => normaliseBill(b, oMap)
 //     );
@@ -682,6 +775,12 @@
 
 //   useEffect(() => { loadAll(); }, [loadAll]);
 
+//   useEffect(() => {
+//     api.request("/shop/profile").then((res) => {
+//       if (res.ok) setShopProfile(res.data);
+//     });
+//   }, []);
+
 //   /* ── Derived data ── */
 //   const deliveredOrders = orders.filter(
 //     (o) => o.status === "delivered" || o.status === "approved"
@@ -690,14 +789,62 @@
 //   const unbilledOrders = deliveredOrders.filter((o) => !billedOrderIds.has(o.id));
 //   const selectedOrder = orderMap[selectedOrderId];
 
+//   // ✅ FIX: billExportColumns and useTableData MUST be declared before any
+//   //         early return so that hook call order is identical on every render.
+//   const billExportColumns: ExportColumn<Bill>[] = [
+//     { header: "Bill #", accessor: (b) => b.billNumber },
+//     { header: "Order #", accessor: (b) => orderMap[b.orderId]?.order_number || "" },
+//     { header: "Customer", accessor: (b) => customerMap[b.customerId]?.name || "" },
+//     { header: "Subtotal", accessor: (b) => Number(b.subtotal || 0) },
+//     { header: "GST", accessor: (b) => Number(b.gstAmount || 0) },
+//     { header: "Discount", accessor: (b) => Number(b.discount || 0) },
+//     { header: "Total", accessor: (b) => Number(b.totalAmount || 0) },
+//     { header: "Paid", accessor: (b) => Number(b.paidAmount || 0) },
+//     { header: "Balance", accessor: (b) => Number(b.balanceAmount || 0) },
+//     { header: "Payment Method", accessor: (b) => b.paymentMethod || "" },
+//     { header: "Status", accessor: (b) => b.status || "" },
+//     { header: "Date", accessor: (b) => new Date(b.createdAt).toLocaleDateString() },
+//   ];
+
+//   const billTable = useTableData<Bill>(
+//     bills,
+//     (b, q) => {
+//       const cust = customerMap[b.customerId]?.name || "";
+//       const ord = orderMap[b.orderId]?.order_number || "";
+//       return (
+//         (b.billNumber || "").toLowerCase().includes(q) ||
+//         ord.toLowerCase().includes(q) ||
+//         cust.toLowerCase().includes(q) ||
+//         (b.status || "").toLowerCase().includes(q) ||
+//         (b.paymentMethod || "").toLowerCase().includes(q)
+//       );
+//     },
+//     10,
+//   );
+
+//   // ✅ Early return AFTER all hooks
+//   if (loading) {
+//     return (
+//       <AppLayout>
+//         <div className="flex items-center justify-center h-64 text-muted-foreground">
+//           Loading billing data…
+//         </div>
+//       </AppLayout>
+//     );
+//   }
+
+//   /* ── Handlers ── */
 //   const handleCreate = async () => {
 //     if (!selectedOrder) return;
-//     const disc = Number(discount);
-//     const total = Number(selectedOrder.total_amount) - disc;
-//     const paid = Number(paidAmount) || total;
+//     const disc = Number(discount) || 0;
+//     const exchangeGrams = Number(oldGoldGrams) || 0;
+//     const exchangeRate = Number(oldGoldRate) || 0;
+//     const exchangeValue = +(exchangeGrams * exchangeRate).toFixed(2);
+//     const total = +(Number(selectedOrder.total_amount) - disc - exchangeValue).toFixed(2);
+//     const paid = paidAmount === "" ? total : Number(paidAmount) || 0;
 //     const fullyPaid = paid >= total;
 
-//     await billStore.add({
+//     const createdBill: any = await billStore.add({
 //       orderId: selectedOrder.id,
 //       customerId: selectedOrder.customer_id,
 //       items: selectedOrder.items,
@@ -712,22 +859,61 @@
 //       status: fullyPaid ? "paid" : paid > 0 ? "partial" : "unpaid",
 //     });
 
-//     // Sync payment_received on the parent order so the dashboard / orders
-//     // page reflects payment state. Backend may ignore unknown fields — that's
-//     // a soft failure, the bill itself is still the source of truth.
 //     if (fullyPaid) {
 //       try {
 //         await orderStore.update(selectedOrder.id, { payment_received: true, paymentReceived: true });
 //       } catch (e) {
-//         console.warn('Could not sync payment_received on order', e);
+//         console.warn("Could not sync payment_received on order", e);
 //       }
 //     }
 
-//     await loadAll(); qc.invalidateQueries({ queryKey: qk.bills }); qc.invalidateQueries({ queryKey: qk.orders });
+//     // ── Post to customer ledger ─────────────────────────────
+//     try {
+//       const today = new Date().toISOString().slice(0, 10);
+//       const billNo = createdBill?.bill_number || createdBill?.billNumber || "";
+//       const ledger = localDb.read<LedgerEntry[]>(LEDGER_KEY, []);
+//       const newEntries: LedgerEntry[] = [];
+
+//       if (exchangeValue > 0) {
+//         newEntries.push({
+//           id: newId(),
+//           customerId: selectedOrder.customer_id,
+//           date: today,
+//           type: "exchange",
+//           amount: exchangeValue,
+//           notes: `Old gold against bill ${billNo}`,
+//           oldGoldGrams: exchangeGrams,
+//           oldGoldPurity,
+//           oldGoldRate: exchangeRate,
+//           createdAt: new Date().toISOString(),
+//         });
+//       }
+//       if (paid > 0) {
+//         newEntries.push({
+//           id: newId(),
+//           customerId: selectedOrder.customer_id,
+//           date: today,
+//           type: "payment",
+//           amount: paid,
+//           notes: `Payment for bill ${billNo} (${paymentMethod})`,
+//           createdAt: new Date().toISOString(),
+//         });
+//       }
+//       if (newEntries.length) localDb.write(LEDGER_KEY, [...newEntries, ...ledger]);
+//     } catch (e) {
+//       console.warn("Ledger posting failed", e);
+//     }
+
+//     await loadAll();
+//     qc.invalidateQueries({ queryKey: qk.bills });
+//     qc.invalidateQueries({ queryKey: qk.orders });
 //     setDialogOpen(false);
 //     setSelectedOrderId("");
 //     setDiscount("0");
 //     setPaidAmount("");
+//     setOldGoldGrams("");
+//     setOldGoldRate("");
+//     setOldGoldPurity("22K");
 //   };
 
 //   const handlePrint = () => {
@@ -785,63 +971,6 @@
 //   };
 
 //   const detailCustomer = detailBill ? customerMap[detailBill.customerId] : null;
-
-//   useEffect(() => {
-//     api.request('/shop/profile').then(res => {
-//       if (res.ok) setShopProfile(res.data);
-//     });
-//   }, []);
-
-//   if (loading) {
-//     return (
-//       <AppLayout>
-//         <div className="flex items-center justify-center h-64 text-muted-foreground">
-//           Loading billing data…
-//         </div>
-//       </AppLayout>
-//     );
-//   }
-
-
-//   function parseHuids(huids: any): string[] {
-//     if (Array.isArray(huids)) return huids;
-//     if (typeof huids === "string") {
-//       try { return JSON.parse(huids); } catch { return [huids]; }
-//     }
-//     return [];
-//   }
-
-
-
-//   const billExportColumns: ExportColumn<Bill>[] = [
-//     { header: "Bill #", accessor: (b) => b.billNumber },
-//     { header: "Order #", accessor: (b) => orderMap[b.orderId]?.order_number || "" },
-//     { header: "Customer", accessor: (b) => customerMap[b.customerId]?.name || "" },
-//     { header: "Subtotal", accessor: (b) => Number(b.subtotal || 0) },
-//     { header: "GST", accessor: (b) => Number(b.gstAmount || 0) },
-//     { header: "Discount", accessor: (b) => Number(b.discount || 0) },
-//     { header: "Total", accessor: (b) => Number(b.totalAmount || 0) },
-//     { header: "Paid", accessor: (b) => Number(b.paidAmount || 0) },
-//     { header: "Balance", accessor: (b) => Number(b.balanceAmount || 0) },
-//     { header: "Payment Method", accessor: (b) => b.paymentMethod || "" },
-//     { header: "Status", accessor: (b) => b.status || "" },
-//     { header: "Date", accessor: (b) => new Date(b.createdAt).toLocaleDateString() },
-//   ];
-//   const billTable = useTableData<Bill>(
-//     bills,
-//     (b, q) => {
-//       const cust = customerMap[b.customerId]?.name || "";
-//       const ord = orderMap[b.orderId]?.order_number || "";
-//       return (
-//         (b.billNumber || "").toLowerCase().includes(q) ||
-//         ord.toLowerCase().includes(q) ||
-//         cust.toLowerCase().includes(q) ||
-//         (b.status || "").toLowerCase().includes(q) ||
-//         (b.paymentMethod || "").toLowerCase().includes(q)
-//       );
-//     },
-//     10,
-//   );
 
 //   return (
 //     <AppLayout>
@@ -956,7 +1085,6 @@
 //           </CardContent>
 //         </Card>
 
-
 //         {/* ── Create Bill Dialog ── */}
 //         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
 //           <DialogContent>
@@ -978,51 +1106,99 @@
 //                   </SelectContent>
 //                 </Select>
 //               </div>
-//               {selectedOrder && (
-//                 <>
-//                   <div className="p-3 rounded-lg bg-accent/20 text-sm space-y-1">
-//                     <div className="flex justify-between">
-//                       <span className="text-muted-foreground">Subtotal</span>
-//                       <span>₹{Number(selectedOrder.subtotal).toLocaleString("en-IN")}</span>
+//               {selectedOrder && (() => {
+//                 const exchangeValue = (Number(oldGoldGrams) || 0) * (Number(oldGoldRate) || 0);
+//                 const netTotal = Number(selectedOrder.total_amount) - Number(discount || 0) - exchangeValue;
+//                 return (
+//                   <>
+//                     <div className="p-3 rounded-lg bg-accent/20 text-sm space-y-1">
+//                       <div className="flex justify-between">
+//                         <span className="text-muted-foreground">Subtotal</span>
+//                         <span>₹{Number(selectedOrder.subtotal).toLocaleString("en-IN")}</span>
+//                       </div>
+//                       <div className="flex justify-between">
+//                         <span className="text-muted-foreground">GST (3%)</span>
+//                         <span>₹{Number(selectedOrder.gst_amount).toLocaleString("en-IN")}</span>
+//                       </div>
+//                       {exchangeValue > 0 && (
+//                         <div className="flex justify-between text-emerald-600">
+//                           <span>Old gold exchange</span>
+//                           <span>– ₹{exchangeValue.toLocaleString("en-IN")}</span>
+//                         </div>
+//                       )}
+//                       <div className="flex justify-between font-bold border-t border-border pt-1">
+//                         <span>Net Total</span>
+//                         <span>₹{netTotal.toLocaleString("en-IN")}</span>
+//                       </div>
 //                     </div>
-//                     <div className="flex justify-between">
-//                       <span className="text-muted-foreground">GST (3%)</span>
-//                       <span>₹{Number(selectedOrder.gst_amount).toLocaleString("en-IN")}</span>
+//                     <div className="grid grid-cols-2 gap-4">
+//                       <div className="grid gap-2">
+//                         <Label>Discount (₹)</Label>
+//                         <Input type="number" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+//                       </div>
+//                       <div className="grid gap-2">
+//                         <Label>Paid Amount (₹)</Label>
+//                         <Input
+//                           type="number"
+//                           value={paidAmount}
+//                           onChange={(e) => setPaidAmount(e.target.value)}
+//                           placeholder={String(netTotal)}
+//                         />
+//                       </div>
 //                     </div>
-//                     <div className="flex justify-between font-bold">
-//                       <span>Total</span>
-//                       <span>₹{Number(selectedOrder.total_amount).toLocaleString("en-IN")}</span>
+
+//                     {/* Old Gold Exchange */}
+//                     <div className="rounded-lg border border-border p-3 space-y-2">
+//                       <div className="flex items-center justify-between">
+//                         <Label className="text-sm font-semibold">Old Gold Exchange (optional)</Label>
+//                         <Button
+//                           type="button"
+//                           variant="ghost"
+//                           size="sm"
+//                           className="h-7 px-2 text-xs"
+//                           onClick={() => setOldGoldRate(String(latestGoldRate(oldGoldPurity) || ""))}
+//                         >
+//                           Use today's rate
+//                         </Button>
+//                       </div>
+//                       <div className="grid grid-cols-3 gap-2">
+//                         <div className="grid gap-1">
+//                           <Label className="text-xs">Grams</Label>
+//                           <Input type="number" step="0.001" value={oldGoldGrams} onChange={(e) => setOldGoldGrams(e.target.value)} />
+//                         </div>
+//                         <div className="grid gap-1">
+//                           <Label className="text-xs">Purity</Label>
+//                           <Select value={oldGoldPurity} onValueChange={(v) => { setOldGoldPurity(v); const r = latestGoldRate(v); if (r) setOldGoldRate(String(r)); }}>
+//                             <SelectTrigger><SelectValue /></SelectTrigger>
+//                             <SelectContent>
+//                               <SelectItem value="24K">24K</SelectItem>
+//                               <SelectItem value="22K">22K</SelectItem>
+//                               <SelectItem value="18K">18K</SelectItem>
+//                             </SelectContent>
+//                           </Select>
+//                         </div>
+//                         <div className="grid gap-1">
+//                           <Label className="text-xs">Rate /gm</Label>
+//                           <Input type="number" value={oldGoldRate} onChange={(e) => setOldGoldRate(e.target.value)} />
+//                         </div>
+//                       </div>
 //                     </div>
-//                   </div>
-//                   <div className="grid grid-cols-2 gap-4">
+
 //                     <div className="grid gap-2">
-//                       <Label>Discount (₹)</Label>
-//                       <Input type="number" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+//                       <Label>Payment Method</Label>
+//                       <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as Bill["paymentMethod"])}>
+//                         <SelectTrigger><SelectValue /></SelectTrigger>
+//                         <SelectContent>
+//                           <SelectItem value="cash">Cash</SelectItem>
+//                           <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+//                           <SelectItem value="cheque">Cheque</SelectItem>
+//                           <SelectItem value="upi">UPI</SelectItem>
+//                         </SelectContent>
+//                       </Select>
 //                     </div>
-//                     <div className="grid gap-2">
-//                       <Label>Paid Amount (₹)</Label>
-//                       <Input
-//                         type="number"
-//                         value={paidAmount}
-//                         onChange={(e) => setPaidAmount(e.target.value)}
-//                         placeholder={String(Number(selectedOrder.total_amount) - Number(discount))}
-//                       />
-//                     </div>
-//                   </div>
-//                   <div className="grid gap-2">
-//                     <Label>Payment Method</Label>
-//                     <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as Bill["paymentMethod"])}>
-//                       <SelectTrigger><SelectValue /></SelectTrigger>
-//                       <SelectContent>
-//                         <SelectItem value="cash">Cash</SelectItem>
-//                         <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-//                         <SelectItem value="cheque">Cheque</SelectItem>
-//                         <SelectItem value="upi">UPI</SelectItem>
-//                       </SelectContent>
-//                     </Select>
-//                   </div>
-//                 </>
-//               )}
+//                   </>
+//                 );
+//               })()}
 //             </div>
 //             <DialogFooter>
 //               <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
@@ -1110,7 +1286,12 @@
 //             </DialogHeader>
 //             <div ref={printRef} className="border border-border rounded-md overflow-auto max-h-[65vh] bg-white p-2">
 //               {invoiceBill && (
-//                 <CusInvoice bill={invoiceBill} customerMap={customerMap} productTypeMap={productTypeMap} shopProfile={shopProfile} />
+//                 <CusInvoice
+//                   bill={invoiceBill}
+//                   customerMap={customerMap}
+//                   productTypeMap={productTypeMap}
+//                   shopProfile={shopProfile}
+//                 />
 //               )}
 //             </div>
 //             <DialogFooter>
@@ -1134,7 +1315,12 @@
 //             </DialogHeader>
 //             <div className="border border-border rounded-md overflow-auto max-h-[65vh] bg-white p-2">
 //               {vybBill && (
-//                 <VyabariInvoice bill={vybBill} customerMap={customerMap} productTypeMap={productTypeMap} shopProfile={shopProfile} />
+//                 <VyabariInvoice
+//                   bill={vybBill}
+//                   customerMap={customerMap}
+//                   productTypeMap={productTypeMap}
+//                   shopProfile={shopProfile}
+//                 />
 //               )}
 //             </div>
 //             <DialogFooter>
@@ -1149,6 +1335,7 @@
 //     </AppLayout>
 //   );
 // }
+
 
 // src/routes/billing.tsx
 import { createFileRoute } from "@tanstack/react-router";
@@ -1167,6 +1354,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 import {
   orderStore, customerStore, productTypeStore, billStore,
 } from "@/lib/store";
@@ -1271,16 +1459,26 @@ function normaliseBill(b: any, oMap: OrderMap): Bill {
   const order = oMap[orderId];
 
   // items live on the order, not the bill row
-  const items = (order?.items ?? b.items ?? []).map((item: any) => ({
-    ...item,
-    id: item.id,
-    productTypeId: item.product_type_id ?? item.productTypeId ?? "",
-    quantity: Number(item.quantity ?? 0),
-    weightGrams: Number(item.weight_grams ?? item.weightGrams ?? 0),
-    makingCharges: Number(item.making_charges ?? item.makingCharges ?? 0),
-    amount: Number(item.amount ?? 0),
-    huids: item.huids ?? [],
-  }));
+  const items = (order?.items ?? b.items ?? []).map((item: any) => {
+    const quantity = Number(item.quantity ?? 0);
+    const weightGrams = Number(item.weight_grams ?? item.weightGrams ?? 0);
+    const ratePerGram = Number(item.rate_per_gram ?? item.ratePerGram ?? 0);
+    const makingCharges = Number(item.making_charges ?? item.makingCharges ?? 0);
+    return {
+      ...item,
+      id: item.id,
+      productTypeId: item.product_type_id ?? item.productTypeId ?? "",
+      quantity,
+      weightGrams,
+      ratePerGram,
+      makingCharges,
+      // Line amount isn't stored anywhere (order_items has no 'amount'
+      // column) — it must be derived the same way order totals are
+      // computed server-side (orderController.create): weight * rate + making.
+      amount: weightGrams * ratePerGram + makingCharges,
+      huids: item.huids ?? [],
+    };
+  });
 
   return {
     ...b,
@@ -1328,6 +1526,8 @@ function CusInvoice({
   const roundOff = +(Math.round(bill.totalAmount) - bill.totalAmount).toFixed(2);
   const finalTotal = Math.round(bill.totalAmount);
 
+
+
   const rateFor = (metalKeyword: string) => {
     const it = bill.items.find((i: any) => {
       const pt = productTypeMap[i.productTypeId];
@@ -1345,6 +1545,8 @@ function CusInvoice({
     verticalAlign: "top",
     ...extra,
   });
+
+  console.log("CusInvoice render", { bill, customer, shopProfile, productTypeMap });
 
   return (
     <div
@@ -1932,7 +2134,9 @@ function BillingPage() {
   const deliveredOrders = orders.filter(
     (o) => o.status === "delivered" || o.status === "approved"
   );
-  const billedOrderIds = new Set(bills.map((b) => b.orderId));
+  const billedOrderIds = new Set(
+    bills.filter((b: any) => b.status !== 'void').map((b) => b.orderId)
+  );
   const unbilledOrders = deliveredOrders.filter((o) => !billedOrderIds.has(o.id));
   const selectedOrder = orderMap[selectedOrderId];
 
@@ -2063,6 +2267,23 @@ function BillingPage() {
     setOldGoldPurity("22K");
   };
 
+  const handleVoidBill = async (bill: Bill) => {
+    const reason = window.prompt(
+      `Void bill ${bill.billNumber}?\n\nThis keeps the record for audit purposes but stops it counting toward revenue, and unlocks the order so it can be cancelled/returned if needed.\n\nOptional reason:`
+    );
+    if (reason === null) return; // user hit Cancel on the prompt
+    try {
+      await billStore.void(bill.id, reason || undefined);
+      toast.success(`Bill ${bill.billNumber} voided`);
+      await loadAll();
+      qc.invalidateQueries({ queryKey: qk.bills });
+      qc.invalidateQueries({ queryKey: qk.orders });
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || "Failed to void bill";
+      toast.error(msg);
+    }
+  };
+
   const handlePrint = () => {
     const content = document.getElementById("cus-invoice-print");
     if (!content) return;
@@ -2177,11 +2398,13 @@ function BillingPage() {
                         <TableCell>
                           <Badge
                             variant={
-                              b.status === "paid"
-                                ? "default"
-                                : b.status === "partial"
-                                  ? "outline"
-                                  : "destructive"
+                              b.status === "void"
+                                ? "secondary"
+                                : b.status === "paid"
+                                  ? "default"
+                                  : b.status === "partial"
+                                    ? "outline"
+                                    : "destructive"
                             }
                             className="capitalize"
                           >
@@ -2197,6 +2420,7 @@ function BillingPage() {
                             size="sm"
                             className="ml-1 h-8 px-2 text-xs font-bold tracking-wide border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950"
                             onClick={() => setInvoiceBill(b)}
+                            disabled={b.status === "void"}
                           >
                             CUS
                           </Button>
@@ -2205,9 +2429,20 @@ function BillingPage() {
                             size="sm"
                             className="ml-1 h-8 px-2 text-xs font-bold tracking-wide border-blue-500 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950"
                             onClick={() => setVybBill(b)}
+                            disabled={b.status === "void"}
                           >
                             VYB
                           </Button>
+                          {b.status !== "void" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="ml-1 h-8 px-2 text-xs font-bold tracking-wide border-destructive text-destructive hover:bg-destructive/10"
+                              onClick={() => handleVoidBill(b)}
+                            >
+                              Void
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     );
